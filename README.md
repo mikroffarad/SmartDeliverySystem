@@ -31,4 +31,11 @@ How to run:
 Add-Migration InitialCreate
 Update-Database
 ```
+Or:
+```
+dotnet tool install --global dotnet-ef
+dotnet ef --version
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+```
 5. Run project
