@@ -119,6 +119,21 @@ namespace SmartDeliverySystem.Services
             return true;
         }
 
+        public async Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment)
+        {
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null || delivery.Status == DeliveryStatus.Paid)
+                return false;
+
+            delivery.Status = DeliveryStatus.Paid;
+            delivery.PaymentDate = DateTime.UtcNow;
+            delivery.PaymentMethod = payment.PaymentMethod;
+            delivery.PaidAmount = payment.Amount;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         private async Task<decimal> CalculateTotalAmountAsync(List<ProductRequestDto> products)
         {
             decimal total = 0;

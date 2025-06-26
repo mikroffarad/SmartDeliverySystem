@@ -10,5 +10,6 @@ namespace SmartDeliverySystem.Services
         Task<Delivery?> GetDeliveryAsync(int deliveryId);
         Task<List<Delivery>> GetActiveDeliveriesAsync();
         Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status);
+        Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment);
     }
 }

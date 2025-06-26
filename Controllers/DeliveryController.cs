@@ -82,12 +82,18 @@ namespace SmartDeliverySystem.Controllers
 
             return Ok();
         }
-    }
 
-    public class AssignDriverDto
-    {
-        public string DriverId { get; set; } = string.Empty;
-        public string GpsTrackerId { get; set; } = string.Empty;
-        public DeliveryType DeliveryType { get; set; }
+        [HttpPost("{id}/pay")]
+        public async Task<ActionResult> PayForDelivery(int id, [FromBody] PaymentDto payment)
+        {
+            var result = await _deliveryService.ProcessPaymentAsync(id, payment);
+
+            if (!result)
+                return BadRequest("Payment failed or delivery not found.");
+
+            _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
+
+            return Ok();
+        }
     }
 }

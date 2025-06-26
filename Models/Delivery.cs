@@ -6,7 +6,8 @@
         Assigned,
         InTransit,
         Delivered,
-        Cancelled
+        Cancelled,
+        Paid
     }
 
     public enum DeliveryType
@@ -43,6 +44,9 @@
         public DateTime? AssignedAt { get; set; }
 
         public DateTime? DeliveredAt { get; set; }
+        public DateTime PaymentDate { get; internal set; }
+        public string? PaymentMethod { get; internal set; }
+        public decimal PaidAmount { get; internal set; }
     }
 
     public class DeliveryProduct
