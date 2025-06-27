@@ -23,7 +23,7 @@ Attaches a location of desired store.
 
 How to run:
 1. Clone repo
-2. Open with Visual Studio
+2. Open with Visual Studio or Visual Studio Code
 3. Edit connection string in `appsettings.json`
 3. Tools > NuGet Package Manager > Package Manager Console
 4. Type:

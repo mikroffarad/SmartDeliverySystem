@@ -86,14 +86,26 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("{id}/pay")]
         public async Task<ActionResult> PayForDelivery(int id, [FromBody] PaymentDto payment)
         {
-            var result = await _deliveryService.ProcessPaymentAsync(id, payment);
+            try
+            {
+                var result = await _deliveryService.ProcessPaymentAsync(id, payment);
 
-            if (!result)
-                return BadRequest("Payment failed or delivery not found.");
+                if (!result)
+                    return NotFound("Payment failed or delivery not found.");
 
-            _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
+                _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
 
-            return Ok();
+                return Ok();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Payment error");
+                return StatusCode(500, "Internal Server Error");
+            }
         }
     }
 }

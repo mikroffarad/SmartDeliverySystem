@@ -125,6 +125,9 @@ namespace SmartDeliverySystem.Services
             if (delivery == null || delivery.Status == DeliveryStatus.Paid)
                 return false;
 
+            if (delivery.TotalAmount != payment.Amount)
+                throw new InvalidOperationException($"Payment amount mismatch. Expected: {delivery.TotalAmount}, received: {payment.Amount}");
+
             delivery.Status = DeliveryStatus.Paid;
             delivery.PaymentDate = DateTime.UtcNow;
             delivery.PaymentMethod = payment.PaymentMethod;
