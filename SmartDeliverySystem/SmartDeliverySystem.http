@@ -1,4 +1,4 @@
-@SmartDeliverySystem_HostAddress = http://localhost:5141
+@SmartDeliverySystem_HostAddress = http://localhost:5145
 
 GET {{SmartDeliverySystem_HostAddress}}/weatherforecast/
 Accept: application/json
