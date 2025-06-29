@@ -69,7 +69,13 @@ namespace SmartDeliverySystem.Data
 
                 entity.HasOne(dp => dp.Product)
                     .WithMany()
-                    .HasForeignKey(dp => dp.ProductId);
+                    .HasForeignKey(dp => dp.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(dp => dp.Delivery)
+                    .WithMany()
+                    .HasForeignKey(dp => dp.DeliveryId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
