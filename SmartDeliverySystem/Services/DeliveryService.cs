@@ -20,6 +20,19 @@ namespace SmartDeliverySystem.Services
         {
             _logger.LogInformation("Creating new delivery for vendor {VendorId}", request.VendorId);
 
+            // Check that all products belong to the vendor
+            var productIds = request.Products.Select(p => p.ProductId).ToList();
+            var vendorProductIds = await _context.Products
+                .Where(p => p.VendorId == request.VendorId && productIds.Contains(p.Id))
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            if (vendorProductIds.Count != productIds.Count)
+            {
+                _logger.LogWarning("One or more products do not belong to vendor {VendorId}", request.VendorId);
+                throw new InvalidOperationException("One or more products do not belong to the vendor.");
+            }
+
             // Find best store
             var bestStore = await FindBestStoreAsync(request.VendorId, request.Products);
 
