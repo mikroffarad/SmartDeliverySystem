@@ -1,6 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
-using SmartDeliverySystem.DTOs;
+﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using SmartDeliverySystem.Data;
+using SmartDeliverySystem.DTOs;
 using SmartDeliverySystem.Models;
 
 namespace SmartDeliverySystem.Services
@@ -9,11 +10,14 @@ namespace SmartDeliverySystem.Services
     {
         private readonly DeliveryContext _context;
         private readonly ILogger<DeliveryService> _logger;
+        private readonly IMapper _mapper;
 
-        public DeliveryService(DeliveryContext context, ILogger<DeliveryService> logger)
+
+        public DeliveryService(DeliveryContext context, ILogger<DeliveryService> logger, IMapper mapper)
         {
             _context = context;
             _logger = logger;
+            _mapper = mapper;
         }
 
         public async Task<DeliveryResponseDto> CreateDeliveryAsync(DeliveryRequestDto request)
@@ -39,13 +43,24 @@ namespace SmartDeliverySystem.Services
             // Calculate total amount
             var totalAmount = await CalculateTotalAmountAsync(request.Products);
 
+            // Get vendor and store coordinates
+            var vendor = await _context.Vendors.FindAsync(request.VendorId);
+            double? fromLat = vendor?.Latitude;
+            double? fromLon = vendor?.Longitude;
+            double? toLat = bestStore?.Latitude;
+            double? toLon = bestStore?.Longitude;
+
             // Create delivery
             var delivery = new Delivery
             {
                 VendorId = request.VendorId,
                 StoreId = bestStore.Id,
                 TotalAmount = totalAmount,
-                Status = DeliveryStatus.Pending
+                Status = DeliveryStatus.Pending,
+                FromLatitude = fromLat,
+                FromLongitude = fromLon,
+                ToLatitude = toLat,
+                ToLongitude = toLon
             };
 
             _context.Deliveries.Add(delivery);
@@ -75,7 +90,6 @@ namespace SmartDeliverySystem.Services
 
         public async Task<Store> FindBestStoreAsync(int vendorId, List<ProductRequestDto> products)
         {
-            // Simple algorithm - find a nearest active store
             var vendor = await _context.Vendors.FindAsync(vendorId);
             if (vendor == null)
                 throw new ArgumentException("Vendor not found");
@@ -87,8 +101,27 @@ namespace SmartDeliverySystem.Services
             if (!activeStores.Any())
                 throw new InvalidOperationException("No active stores available");
 
-            // Find a nearest store (by coordinates)
-            var nearestStore = activeStores.OrderBy(store =>
+            // Завантажити StoreProducts для всіх активних магазинів
+            var storeProducts = await _context.Set<StoreProduct>()
+                .Where(sp => activeStores.Select(s => s.Id).Contains(sp.StoreId))
+                .ToListAsync();
+
+            // Знайти магазини, у яких є всі потрібні продукти у потрібній кількості
+            var suitableStores = activeStores.Where(store =>
+                products.All(req =>
+                    storeProducts.Any(sp =>
+                        sp.StoreId == store.Id &&
+                        sp.ProductId == req.ProductId &&
+                        sp.Quantity >= req.Quantity
+                    )
+                )
+            ).ToList();
+
+            if (!suitableStores.Any())
+                throw new InvalidOperationException("No store has all required products in sufficient quantity");
+
+            // Знайти найближчий з них
+            var nearestStore = suitableStores.OrderBy(store =>
                 CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude))
                 .First();
 
@@ -180,6 +213,16 @@ namespace SmartDeliverySystem.Services
             var distance = 6371 * c; // Earth's radius in km
 
             return distance;
+        }
+        public async Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto)
+        {
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null)
+                return false;
+
+            _mapper.Map(dto, delivery);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

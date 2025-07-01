@@ -25,10 +25,10 @@ namespace SmartDeliverySystem.Controllers
 
             var vendors = new List<Vendor>
             {
-                new Vendor { Name = "ТОВ 'Київхліб'", 
-                            ContactEmail = "orders@kyivbread.com", 
-                            Address = "вул. Промислова, 5, Київ", 
-                            Latitude = 50.4215, 
+                new Vendor { Name = "ТОВ 'Київхліб'",
+                            ContactEmail = "orders@kyivbread.com",
+                            Address = "вул. Промислова, 5, Київ",
+                            Latitude = 50.4215,
                             Longitude = 30.5384 },
                 new Vendor { Name = "Молочна ферма 'Буренка'", ContactEmail = "delivery@burenka.ua", Address = "с. Борщагівка, Київська обл.", Latitude = 50.4089, Longitude = 30.3526 }
             };
@@ -55,12 +55,32 @@ namespace SmartDeliverySystem.Controllers
             _context.Products.AddRange(products);
             await _context.SaveChangesAsync();
 
+            // StoreProducts: наповнюємо магазини продуктами з різною кількістю
+            var storeProducts = new List<StoreProduct>
+            {
+                // Магазин Центр
+                new StoreProduct { StoreId = stores[0].Id, ProductId = products[0].Id, Quantity = 200 }, // Хліб білий
+                new StoreProduct { StoreId = stores[0].Id, ProductId = products[1].Id, Quantity = 50 },  // Молоко
+                new StoreProduct { StoreId = stores[0].Id, ProductId = products[2].Id, Quantity = 120 }, // Яблука
+                // Магазин Поділ
+                new StoreProduct { StoreId = stores[1].Id, ProductId = products[0].Id, Quantity = 80 },  // Хліб білий
+                new StoreProduct { StoreId = stores[1].Id, ProductId = products[3].Id, Quantity = 60 },  // Яйця
+                new StoreProduct { StoreId = stores[1].Id, ProductId = products[4].Id, Quantity = 90 },  // Макарони
+                // Магазин Оболонь
+                new StoreProduct { StoreId = stores[2].Id, ProductId = products[1].Id, Quantity = 100 }, // Молоко
+                new StoreProduct { StoreId = stores[2].Id, ProductId = products[2].Id, Quantity = 70 },  // Яблука
+                new StoreProduct { StoreId = stores[2].Id, ProductId = products[4].Id, Quantity = 150 }  // Макарони
+            };
+            _context.StoreProducts.AddRange(storeProducts);
+            await _context.SaveChangesAsync();
+
             return Ok(new
             {
                 Message = "Test data created successfully",
                 Stores = stores.Count,
                 Products = products.Count,
-                Vendors = vendors.Count
+                Vendors = vendors.Count,
+                StoreProducts = storeProducts.Count
             });
         }
     }

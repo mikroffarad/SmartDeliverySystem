@@ -17,6 +17,8 @@ namespace SmartDeliverySystem.Data
         public DbSet<Vendor> Vendors { get; set; }
         public DbSet<Delivery> Deliveries { get; set; }
         public DbSet<DeliveryProduct> DeliveryProducts { get; set; }
+        public DbSet<StoreProduct> StoreProducts { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -76,6 +78,23 @@ namespace SmartDeliverySystem.Data
                     .WithMany()
                     .HasForeignKey(dp => dp.DeliveryId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<StoreProduct>(entity =>
+            {
+                entity.HasKey(e => new { e.StoreId, e.ProductId });
+
+                entity.HasOne(sp => sp.Store)
+                    .WithMany()
+                    .HasForeignKey(sp => sp.StoreId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sp => sp.Product)
+                    .WithMany()
+                    .HasForeignKey(sp => sp.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.Property(sp => sp.Quantity).IsRequired();
             });
         }
     }

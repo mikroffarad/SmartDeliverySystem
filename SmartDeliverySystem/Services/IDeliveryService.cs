@@ -11,5 +11,6 @@ namespace SmartDeliverySystem.Services
         Task<List<Delivery>> GetActiveDeliveriesAsync();
         Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status);
         Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment);
+        Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto);
     }
 }

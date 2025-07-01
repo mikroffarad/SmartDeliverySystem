@@ -58,11 +58,10 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("{id}/assign-driver")]
         public async Task<ActionResult> AssignDriver(int id, [FromBody] AssignDriverDto dto)
         {
-            // TODO: Implement driver assignment logic
+            var updated = await _deliveryService.AssignDriverAsync(id, dto);
+            if (!updated)
+                return NotFound();
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId}", dto.DriverId, id);
-
-            await _deliveryService.UpdateDeliveryStatusAsync(id, DeliveryStatus.Assigned);
-
             return Ok();
         }
 

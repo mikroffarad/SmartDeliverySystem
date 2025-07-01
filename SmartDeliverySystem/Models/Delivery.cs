@@ -47,6 +47,10 @@
         public DateTime PaymentDate { get; internal set; }
         public string? PaymentMethod { get; internal set; }
         public decimal PaidAmount { get; internal set; }
+        public double? FromLatitude { get; set; }
+        public double? FromLongitude { get; set; }
+        public double? ToLatitude { get; set; }
+        public double? ToLongitude { get; set; }
     }
 
     public class DeliveryProduct
