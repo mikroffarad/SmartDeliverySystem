@@ -21,26 +21,9 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("request")]
         public async Task<ActionResult<DeliveryResponseDto>> RequestDelivery([FromBody] DeliveryRequestDto request)
         {
-            try
-            {
-                _logger.LogInformation("Delivery request received from vendor {VendorId}", request.VendorId);
-
-                var response = await _deliveryService.CreateDeliveryAsync(request);
-                return Ok(response);
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing delivery request");
-                return StatusCode(500, "Internal server error");
-            }
+            _logger.LogInformation("Delivery request received from vendor {VendorId}", request.VendorId);
+            var response = await _deliveryService.CreateDeliveryAsync(request);
+            return Ok(response);
         }
 
         [HttpGet("{id}")]
@@ -86,26 +69,11 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("{id}/pay")]
         public async Task<ActionResult> PayForDelivery(int id, [FromBody] PaymentDto payment)
         {
-            try
-            {
-                var result = await _deliveryService.ProcessPaymentAsync(id, payment);
-
-                if (!result)
-                    return NotFound("Payment failed or delivery not found.");
-
-                _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
-
-                return Ok();
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Payment error");
-                return StatusCode(500, "Internal Server Error");
-            }
+            var result = await _deliveryService.ProcessPaymentAsync(id, payment);
+            if (!result)
+                return NotFound("Payment failed or delivery not found.");
+            _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
+            return Ok();
         }
     }
 }

@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using SmartDeliverySystem.Services;
 using SmartDeliverySystem.Data;
+using SmartDeliverySystem.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddAutoMapper(typeof(SmartDeliverySystem.Mapping.MappingProfile));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
 
 // Database
 builder.Services.AddDbContext<DeliveryContext>(options =>
@@ -36,6 +39,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
