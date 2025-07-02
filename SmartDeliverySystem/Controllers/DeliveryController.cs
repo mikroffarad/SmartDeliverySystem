@@ -11,12 +11,14 @@ namespace SmartDeliverySystem.Controllers
     {
         private readonly IDeliveryService _deliveryService;
         private readonly IServiceBusService _serviceBusService;
+        private readonly ISignalRService _signalRService;
         private readonly ILogger<DeliveryController> _logger;
 
-        public DeliveryController(IDeliveryService deliveryService, IServiceBusService serviceBusService, ILogger<DeliveryController> logger)
+        public DeliveryController(IDeliveryService deliveryService, IServiceBusService serviceBusService, ISignalRService signalRService, ILogger<DeliveryController> logger)
         {
             _deliveryService = deliveryService;
             _serviceBusService = serviceBusService;
+            _signalRService = signalRService;
             _logger = logger;
         }
         [HttpPost("request")]
@@ -102,9 +104,7 @@ namespace SmartDeliverySystem.Controllers
         {
             var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
             if (!result)
-                return NotFound("Delivery not found.");
-
-            // Send GPS update to Azure Service Bus for real-time processing
+                return NotFound("Delivery not found.");            // Send GPS update to Azure Service Bus for real-time processing
             try
             {
                 await _serviceBusService.SendLocationUpdateAsync(new
@@ -121,6 +121,17 @@ namespace SmartDeliverySystem.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to send GPS update to Service Bus");
+            }
+
+            // Send real-time update via SignalR
+            try
+            {
+                await _signalRService.SendLocationUpdateAsync(id, locationUpdate.Latitude, locationUpdate.Longitude, locationUpdate.Notes);
+                _logger.LogInformation("📡 Real-time GPS update sent via SignalR for delivery {DeliveryId}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send SignalR update");
             }
 
             _logger.LogInformation("Location updated for delivery {DeliveryId}", id);

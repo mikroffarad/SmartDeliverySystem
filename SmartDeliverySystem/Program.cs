@@ -20,7 +20,10 @@ builder.Services.AddDbContext<DeliveryContext>(options =>
 // Services
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IServiceBusService, ServiceBusService>();
-builder.Services.AddScoped<ITableStorageService, TableStorageService>();
+builder.Services.AddScoped<ISignalRService, SignalRService>();
+
+// SignalR
+builder.Services.AddSignalR();
 
 // Azure Service Bus
 builder.Services.AddSingleton(provider =>
@@ -29,21 +32,15 @@ builder.Services.AddSingleton(provider =>
     return new Azure.Messaging.ServiceBus.ServiceBusClient(connectionString);
 });
 
-// Azure Table Storage
-builder.Services.AddSingleton(provider =>
-{
-    var connectionString = builder.Configuration.GetConnectionString("AzureStorage");
-    return new Azure.Data.Tables.TableServiceClient(connectionString);
-});
-
 // CORS for frontend
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:5500", "http://localhost:5500", "http://localhost:8080", "https://localhost:7183", "file://")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // ������� ��� SignalR
     });
 });
 
@@ -61,5 +58,6 @@ app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<SmartDeliverySystem.Hubs.DeliveryTrackingHub>("/deliveryHub");
 
 app.Run();

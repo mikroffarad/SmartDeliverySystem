@@ -1,0 +1,57 @@
+<!DOCTYPE h <script>
+const connection = new signalR.HubConnectionBuilder()
+.withUrl("http://localhost:5145/deliveryHub", {
+withCredentials: true
+})
+.configureLogging(signalR.LogLevel.Information)
+.build();html>
+
+<head>
+    <title>Smart Delivery Tracking</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+</head>
+
+<body>
+    <h1>🚛 Smart Delivery Real-time Tracking</h1>
+    <div id="messages"></div>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("https://localhost:7183/deliveryHub", {
+                withCredentials: true
+            })
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+
+        // Підключення до всіх доставок
+        connection.start().then(function () {
+            console.log("✅ Connected to SignalR Hub");
+            connection.invoke("JoinAllDeliveries");
+            addMessage("🔗 Connected to delivery tracking");
+        }).catch(function (err) {
+            console.error("❌ SignalR Error: " + err.toString());
+            addMessage("❌ Connection failed: " + err.toString());
+        });        // Слухаємо GPS оновлення
+        connection.on("LocationUpdated", function (data) {
+            console.log("📍 Raw GPS Data received:", data);
+            console.log("📍 Type of data:", typeof data);
+            console.log("📍 Data keys:", Object.keys(data));
+
+            addMessage(`📍 Delivery ${data.deliveryId}: ${data.latitude}, ${data.longitude} - ${data.notes || 'No notes'}`);
+        });
+
+        // Слухаємо статус оновлення
+        connection.on("StatusUpdated", function (data) {
+            console.log("📊 Status Update:", data);
+            addMessage(`📊 Delivery ${data.DeliveryId}: Status changed to ${data.Status}`);
+        });
+
+        function addMessage(message) {
+            const div = document.getElementById("messages");
+            const p = document.createElement("p");
+            p.textContent = new Date().toLocaleTimeString() + " - " + message;
+            div.appendChild(p);
+        }
+    </script>
+</body>
+
+</html>

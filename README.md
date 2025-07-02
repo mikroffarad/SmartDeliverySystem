@@ -123,9 +123,9 @@ GET /api/delivery/tracking/active
 ## Next Steps
 
 - [x] **Azure Functions integration** ✅
-- [x] **Service Bus for async processing** ✅  
+- [x] **Service Bus for async processing** ✅
 - [x] **Table Storage for GPS history** ✅
-- [ ] SignalR for real-time updates
+- [x] **SignalR for real-time updates** ✅
 - [ ] Frontend map visualization
 
 ## Azure Architecture
@@ -141,6 +141,6 @@ Web API → Service Bus → Azure Functions → SQL Database
 ## ⚠️ Security Notice
 
 **Never commit real Azure connection strings to Git!**
-- Use template files (`*.template.json`) 
+- Use template files (`*.template.json`)
 - Add real config files to `.gitignore`
 - Use Azure Key Vault for production
