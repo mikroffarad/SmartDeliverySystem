@@ -31,21 +31,19 @@ The project includes a TestDataController that creates simplified test data:
 How to run:
 1. Clone repo
 2. Open with Visual Studio or Visual Studio Code
-3. Edit connection string in `appsettings.json`
-3. Tools > NuGet Package Manager > Package Manager Console
-4. Type:
-```
-Add-Migration InitialCreate
-Update-Database
-```
-Or:
-```
-dotnet tool install --global dotnet-ef
-dotnet ef --version
-dotnet ef migrations add InitialCreate
-dotnet ef database update
-```
-5. Run project
+3. **Copy configuration files:**
+   ```bash
+   cp SmartDeliverySystem/appsettings.template.json SmartDeliverySystem/appsettings.json
+   cp SmartDeliverySystem.Azure.Functions/local.settings.template.json SmartDeliverySystem.Azure.Functions/local.settings.json
+   ```
+4. **Edit connection strings** in `appsettings.json` and `local.settings.json` with your actual values
+5. Install Entity Framework tools and create database:
+   ```bash
+   dotnet tool install --global dotnet-ef
+   dotnet ef migrations add InitialCreate
+   dotnet ef database update
+   ```
+6. Run project
 
 ## API Usage Examples
 
@@ -124,8 +122,25 @@ GET /api/delivery/tracking/active
 
 ## Next Steps
 
-- [ ] Azure Functions integration
+- [x] **Azure Functions integration** ✅
+- [x] **Service Bus for async processing** ✅  
+- [x] **Table Storage for GPS history** ✅
 - [ ] SignalR for real-time updates
-- [ ] Table Storage for GPS history
-- [ ] Service Bus for async processing
 - [ ] Frontend map visualization
+
+## Azure Architecture
+
+```
+Web API → Service Bus → Azure Functions → SQL Database
+                    ↓
+               Table Storage (GPS History)
+                    ↓
+               SignalR Hub (Real-time updates)
+```
+
+## ⚠️ Security Notice
+
+**Never commit real Azure connection strings to Git!**
+- Use template files (`*.template.json`) 
+- Add real config files to `.gitignore`
+- Use Azure Key Vault for production

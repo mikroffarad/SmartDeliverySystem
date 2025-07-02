@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartDeliverySystem.Services;
 using SmartDeliverySystem.Data;
 using SmartDeliverySystem.Middleware;
+using Azure.Messaging.ServiceBus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,22 @@ builder.Services.AddDbContext<DeliveryContext>(options =>
 
 // Services
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
+builder.Services.AddScoped<IServiceBusService, ServiceBusService>();
+builder.Services.AddScoped<ITableStorageService, TableStorageService>();
+
+// Azure Service Bus
+builder.Services.AddSingleton(provider =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
+    return new Azure.Messaging.ServiceBus.ServiceBusClient(connectionString);
+});
+
+// Azure Table Storage
+builder.Services.AddSingleton(provider =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("AzureStorage");
+    return new Azure.Data.Tables.TableServiceClient(connectionString);
+});
 
 // CORS for frontend
 builder.Services.AddCors(options =>

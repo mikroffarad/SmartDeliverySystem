@@ -10,19 +10,43 @@ namespace SmartDeliverySystem.Controllers
     public class DeliveryController : ControllerBase
     {
         private readonly IDeliveryService _deliveryService;
+        private readonly IServiceBusService _serviceBusService;
         private readonly ILogger<DeliveryController> _logger;
 
-        public DeliveryController(IDeliveryService deliveryService, ILogger<DeliveryController> logger)
+        public DeliveryController(IDeliveryService deliveryService, IServiceBusService serviceBusService, ILogger<DeliveryController> logger)
         {
             _deliveryService = deliveryService;
+            _serviceBusService = serviceBusService;
             _logger = logger;
         }
-
         [HttpPost("request")]
         public async Task<ActionResult<DeliveryResponseDto>> RequestDelivery([FromBody] DeliveryRequestDto request)
         {
             _logger.LogInformation("Delivery request received from vendor {VendorId}", request.VendorId);
             var response = await _deliveryService.CreateDeliveryAsync(request);
+
+            // Send message to Azure Service Bus
+            try
+            {
+                _logger.LogInformation("🔄 Attempting to send message to Service Bus...");
+                _logger.LogInformation("ServiceBusService is null: {IsNull}", _serviceBusService == null);
+
+                await _serviceBusService.SendDeliveryRequestAsync(new
+                {
+                    DeliveryId = response.DeliveryId,
+                    VendorId = request.VendorId,
+                    StoreId = response.StoreId,
+                    TotalAmount = response.TotalAmount,
+                    CreatedAt = DateTime.UtcNow
+                });
+                _logger.LogInformation("✅ Delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to send delivery request to Service Bus: {Message}. StackTrace: {StackTrace}", ex.Message, ex.StackTrace);
+                // Continue execution even if Service Bus fails
+            }
+
             return Ok(response);
         }
 
@@ -73,13 +97,32 @@ namespace SmartDeliverySystem.Controllers
             _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
             return Ok();
         }
-
         [HttpPost("{id}/update-location")]
         public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
         {
             var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
             if (!result)
                 return NotFound("Delivery not found.");
+
+            // Send GPS update to Azure Service Bus for real-time processing
+            try
+            {
+                await _serviceBusService.SendLocationUpdateAsync(new
+                {
+                    DeliveryId = id,
+                    Latitude = locationUpdate.Latitude,
+                    Longitude = locationUpdate.Longitude,
+                    Speed = locationUpdate.Speed,
+                    Notes = locationUpdate.Notes,
+                    Timestamp = DateTime.UtcNow
+                });
+                _logger.LogInformation("📍 GPS update sent to Azure Service Bus for delivery {DeliveryId}", id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send GPS update to Service Bus");
+            }
+
             _logger.LogInformation("Location updated for delivery {DeliveryId}", id);
             return Ok();
         }
