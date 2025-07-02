@@ -64,7 +64,6 @@ namespace SmartDeliverySystem.Controllers
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId}", dto.DriverId, id);
             return Ok();
         }
-
         [HttpPost("{id}/pay")]
         public async Task<ActionResult> PayForDelivery(int id, [FromBody] PaymentDto payment)
         {
@@ -73,6 +72,32 @@ namespace SmartDeliverySystem.Controllers
                 return NotFound("Payment failed or delivery not found.");
             _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
             return Ok();
+        }
+
+        [HttpPost("{id}/update-location")]
+        public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
+        {
+            var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
+            if (!result)
+                return NotFound("Delivery not found.");
+            _logger.LogInformation("Location updated for delivery {DeliveryId}", id);
+            return Ok();
+        }
+
+        [HttpGet("{id}/tracking")]
+        public async Task<ActionResult<DeliveryTrackingDto>> GetDeliveryTracking(int id)
+        {
+            var tracking = await _deliveryService.GetDeliveryTrackingAsync(id);
+            if (tracking == null)
+                return NotFound("Delivery not found.");
+            return Ok(tracking);
+        }
+
+        [HttpGet("tracking/active")]
+        public async Task<ActionResult<List<DeliveryTrackingDto>>> GetAllActiveTracking()
+        {
+            var trackingList = await _deliveryService.GetAllActiveTrackingAsync();
+            return Ok(trackingList);
         }
     }
 }

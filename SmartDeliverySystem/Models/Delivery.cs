@@ -51,15 +51,33 @@
         public double? FromLongitude { get; set; }
         public double? ToLatitude { get; set; }
         public double? ToLongitude { get; set; }
-    }
 
+        // GPS Tracking properties
+        public double? CurrentLatitude { get; set; }
+        public double? CurrentLongitude { get; set; }
+        public DateTime? LastLocationUpdate { get; set; }
+        public string? TrackingNotes { get; set; }
+    }
     public class DeliveryProduct
     {
         public int Id { get; set; }
         public int DeliveryId { get; set; }
-        public Delivery Delivery { get; set; }
+        public Delivery? Delivery { get; set; }
         public int ProductId { get; set; }
         public Product? Product { get; set; }
         public int Quantity { get; set; }
+    }
+
+    // New GPS tracking model
+    public class DeliveryLocationHistory
+    {
+        public int Id { get; set; }
+        public int DeliveryId { get; set; }
+        public Delivery? Delivery { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        public string? Notes { get; set; }
+        public double? Speed { get; set; } // km/h
     }
 }

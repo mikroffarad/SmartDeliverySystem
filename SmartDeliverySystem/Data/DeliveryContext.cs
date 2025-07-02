@@ -11,13 +11,13 @@ namespace SmartDeliverySystem.Data
         public DeliveryContext(DbContextOptions<DeliveryContext> options) : base(options)
         {
         }
-
         public DbSet<Product> Products { get; set; }
         public DbSet<Store> Stores { get; set; }
         public DbSet<Vendor> Vendors { get; set; }
         public DbSet<Delivery> Deliveries { get; set; }
         public DbSet<DeliveryProduct> DeliveryProducts { get; set; }
         public DbSet<StoreProduct> StoreProducts { get; set; }
+        public DbSet<DeliveryLocationHistory> DeliveryLocationHistory { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -78,9 +78,7 @@ namespace SmartDeliverySystem.Data
                     .WithMany()
                     .HasForeignKey(dp => dp.DeliveryId)
                     .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            modelBuilder.Entity<StoreProduct>(entity =>
+            }); modelBuilder.Entity<StoreProduct>(entity =>
             {
                 entity.HasKey(e => new { e.StoreId, e.ProductId });
 
@@ -95,6 +93,21 @@ namespace SmartDeliverySystem.Data
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.Property(sp => sp.Quantity).IsRequired();
+            });
+
+            // DeliveryLocationHistory configuration
+            modelBuilder.Entity<DeliveryLocationHistory>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.HasOne(dlh => dlh.Delivery)
+                    .WithMany()
+                    .HasForeignKey(dlh => dlh.DeliveryId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(dlh => dlh.Latitude).IsRequired();
+                entity.Property(dlh => dlh.Longitude).IsRequired();
+                entity.Property(dlh => dlh.Timestamp).IsRequired();
             });
         }
     }

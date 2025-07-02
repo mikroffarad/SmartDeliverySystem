@@ -35,10 +35,10 @@ namespace SmartDeliverySystem.Services
             {
                 _logger.LogWarning("One or more products do not belong to vendor {VendorId}", request.VendorId);
                 throw new InvalidOperationException("One or more products do not belong to the vendor.");
-            }
-
-            // Find best store
+            }            // Find best store
             var bestStore = await FindBestStoreAsync(request.VendorId, request.Products);
+            if (bestStore == null)
+                throw new InvalidOperationException("No suitable store found for delivery.");
 
             // Calculate total amount
             var totalAmount = await CalculateTotalAmountAsync(request.Products);
@@ -47,8 +47,8 @@ namespace SmartDeliverySystem.Services
             var vendor = await _context.Vendors.FindAsync(request.VendorId);
             double? fromLat = vendor?.Latitude;
             double? fromLon = vendor?.Longitude;
-            double? toLat = bestStore?.Latitude;
-            double? toLon = bestStore?.Longitude;
+            double? toLat = bestStore.Latitude;
+            double? toLon = bestStore.Longitude;
 
             // Create delivery
             var delivery = new Delivery
@@ -120,12 +120,22 @@ namespace SmartDeliverySystem.Services
             if (!suitableStores.Any())
                 throw new InvalidOperationException("No store has all required products in sufficient quantity");
 
-            // Знайти найближчий з них
-            var nearestStore = suitableStores.OrderBy(store =>
-                CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude))
-                .First();
+            // Комбінований критерій: відстань - коеф * залишок потрібних товарів
+            double stockWeight = 0.01; // налаштуйте під себе
+            var bestStore = suitableStores
+                .Select(store =>
+                {
+                    var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude);
+                    var totalStock = products.Sum(req =>
+                        storeProducts.First(sp => sp.StoreId == store.Id && sp.ProductId == req.ProductId).Quantity
+                    );
+                    double score = distance - stockWeight * totalStock;
+                    return new { Store = store, Score = score };
+                })
+                .OrderBy(x => x.Score)
+                .First().Store;
 
-            return nearestStore;
+            return bestStore;
         }
 
         public async Task<Delivery?> GetDeliveryAsync(int deliveryId)
@@ -220,9 +230,111 @@ namespace SmartDeliverySystem.Services
             if (delivery == null)
                 return false;
 
-            _mapper.Map(dto, delivery);
+            // Assign driver details
+            delivery.DriverId = dto.DriverId;
+            delivery.GpsTrackerId = dto.GpsTrackerId;
+            delivery.Type = dto.DeliveryType;
+            delivery.Status = DeliveryStatus.Assigned;
+            delivery.AssignedAt = DateTime.UtcNow;
+
+            // Coordinates are already set when delivery was created, no need to update them
+            // FromLatitude, FromLongitude, ToLatitude, ToLongitude were set in CreateDeliveryAsync
+
             await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId} with GPS tracker {GpsTrackerId}",
+                dto.DriverId, deliveryId, dto.GpsTrackerId);
+
             return true;
+        }
+
+        public async Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate)
+        {
+            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            if (delivery == null)
+                return false;
+
+            // Update current location
+            delivery.CurrentLatitude = locationUpdate.Latitude;
+            delivery.CurrentLongitude = locationUpdate.Longitude;
+            delivery.LastLocationUpdate = DateTime.UtcNow;
+            delivery.TrackingNotes = locationUpdate.Notes;
+
+            // Add to location history
+            var locationHistory = new DeliveryLocationHistory
+            {
+                DeliveryId = deliveryId,
+                Latitude = locationUpdate.Latitude,
+                Longitude = locationUpdate.Longitude,
+                Speed = locationUpdate.Speed,
+                Notes = locationUpdate.Notes,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _context.DeliveryLocationHistory.Add(locationHistory);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Location updated for delivery {DeliveryId}: {Lat}, {Lon}",
+                deliveryId, locationUpdate.Latitude, locationUpdate.Longitude);
+
+            return true;
+        }
+
+        public async Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int deliveryId)
+        {
+            var delivery = await _context.Deliveries
+                .FirstOrDefaultAsync(d => d.Id == deliveryId);
+
+            if (delivery == null)
+                return null;
+
+            var locationHistory = await _context.DeliveryLocationHistory
+                .Where(h => h.DeliveryId == deliveryId)
+                .OrderBy(h => h.Timestamp)
+                .Select(h => new LocationHistoryDto
+                {
+                    Latitude = h.Latitude,
+                    Longitude = h.Longitude,
+                    Timestamp = h.Timestamp,
+                    Notes = h.Notes,
+                    Speed = h.Speed
+                })
+                .ToListAsync();
+
+            return new DeliveryTrackingDto
+            {
+                DeliveryId = delivery.Id,
+                DriverId = delivery.DriverId ?? string.Empty,
+                GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
+                Status = delivery.Status,
+                CurrentLatitude = delivery.CurrentLatitude,
+                CurrentLongitude = delivery.CurrentLongitude,
+                LastLocationUpdate = delivery.LastLocationUpdate,
+                FromLatitude = delivery.FromLatitude,
+                FromLongitude = delivery.FromLongitude,
+                ToLatitude = delivery.ToLatitude,
+                ToLongitude = delivery.ToLongitude,
+                LocationHistory = locationHistory
+            };
+        }
+
+        public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
+        {
+            var activeDeliveries = await _context.Deliveries
+                .Where(d => d.Status == DeliveryStatus.Assigned ||
+                           d.Status == DeliveryStatus.InTransit)
+                .ToListAsync();
+
+            var trackingList = new List<DeliveryTrackingDto>();
+
+            foreach (var delivery in activeDeliveries)
+            {
+                var tracking = await GetDeliveryTrackingAsync(delivery.Id);
+                if (tracking != null)
+                    trackingList.Add(tracking);
+            }
+
+            return trackingList;
         }
     }
 }
