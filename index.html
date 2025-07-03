@@ -82,11 +82,13 @@
 
         // Store delivery markers
         const deliveryMarkers = {};
+        const vendorMarkers = {};
+        const storeMarkers = {};
         const deliveryData = {};
 
         // SignalR connection
         const connection = new signalR.HubConnectionBuilder()
-            .withUrl("http://localhost:5145/deliveryHub")
+            .withUrl("https://localhost:7183/deliveryHub")
             .configureLogging(signalR.LogLevel.Information)
             .build();
 
@@ -107,12 +109,10 @@
         connection.on("LocationUpdated", function (data) {
             console.log("📍 GPS Update:", data);
             updateDeliveryOnMap(data);
-        });
-
-        // Load active deliveries from API
+        });        // Load active deliveries from API
         async function loadActiveDeliveries() {
             try {
-                const response = await fetch('http://localhost:5145/api/delivery/active');
+                const response = await fetch('https://localhost:7183/api/delivery/tracking/active');
                 const deliveries = await response.json();
 
                 deliveries.forEach(delivery => {
@@ -123,54 +123,81 @@
             } catch (error) {
                 console.error('Error loading deliveries:', error);
             }
-        }
-
-        // Add delivery to map
+        }        // Add delivery to map
         function addDeliveryToMap(delivery) {
+            // Маркер GPS-трекера (вантажівка водія)
             if (delivery.currentLatitude && delivery.currentLongitude) {
-                const marker = L.marker([delivery.currentLatitude, delivery.currentLongitude])
+                const truckIcon = L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1730/1730543.png',
+                    iconSize: [32, 32]
+                });
+                const marker = L.marker([delivery.currentLatitude, delivery.currentLongitude], { icon: truckIcon })
                     .addTo(map)
                     .bindPopup(`
-                        <b>Delivery #${delivery.id}</b><br>
+                        <b>🚛 Delivery Truck #${delivery.deliveryId}</b><br>
                         Driver: ${delivery.driverId || 'Not assigned'}<br>
                         Status: ${delivery.status}<br>
                         Last Update: ${new Date(delivery.lastLocationUpdate || Date.now()).toLocaleTimeString()}
                     `);
-
-                deliveryMarkers[delivery.id] = marker;
-                deliveryData[delivery.id] = delivery;
+                deliveryMarkers[delivery.deliveryId] = marker;
             }
-        }
-
-        // Update delivery position
+            // Маркер вендора (завод/склад)
+            if (delivery.vendorLatitude && delivery.vendorLongitude) {
+                if (vendorMarkers[delivery.deliveryId]) map.removeLayer(vendorMarkers[delivery.deliveryId]);
+                const factoryIcon = L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1076/1076471.png',
+                    iconSize: [28, 28]
+                });
+                const vendorMarker = L.marker([delivery.vendorLatitude, delivery.vendorLongitude], { icon: factoryIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>🏭 Vendor/Factory</b><br>Start Point<br>Lat: ${delivery.vendorLatitude.toFixed(4)}<br>Lon: ${delivery.vendorLongitude.toFixed(4)}`);
+                vendorMarkers[delivery.deliveryId] = vendorMarker;
+            }
+            // Маркер магазину (кінцева точка)
+            if (delivery.storeLatitude && delivery.storeLongitude) {
+                if (storeMarkers[delivery.deliveryId]) map.removeLayer(storeMarkers[delivery.deliveryId]);
+                const storeIcon = L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
+                    iconSize: [28, 28]
+                });
+                const storeMarker = L.marker([delivery.storeLatitude, delivery.storeLongitude], { icon: storeIcon })
+                    .addTo(map)
+                    .bindPopup(`<b>🏪 Store</b><br>Destination<br>Lat: ${delivery.storeLatitude.toFixed(4)}<br>Lon: ${delivery.storeLongitude.toFixed(4)}`);
+                storeMarkers[delivery.deliveryId] = storeMarker;
+            }
+            deliveryData[delivery.deliveryId] = delivery;
+        }        // Update delivery position
         function updateDeliveryOnMap(data) {
             const deliveryId = data.deliveryId;
 
+            // Оновлюємо маркер GPS-трекера (вантажівки)
             if (deliveryMarkers[deliveryId]) {
-                // Update existing marker
                 deliveryMarkers[deliveryId].setLatLng([data.latitude, data.longitude]);
                 deliveryMarkers[deliveryId].getPopup().setContent(`
-                    <b>Delivery #${deliveryId}</b><br>
+                    <b>🚛 Delivery Truck #${deliveryId}</b><br>
                     Driver: ${deliveryData[deliveryId]?.driverId || 'Not assigned'}<br>
                     Location: ${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}<br>
                     Notes: ${data.notes || 'No notes'}<br>
                     Updated: ${new Date().toLocaleTimeString()}
                 `);
             } else {
-                // Create new marker
-                const marker = L.marker([data.latitude, data.longitude])
+                // Create new truck marker if doesn't exist
+                const truckIcon = L.icon({
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1730/1730543.png',
+                    iconSize: [32, 32]
+                });
+                const marker = L.marker([data.latitude, data.longitude], { icon: truckIcon })
                     .addTo(map)
                     .bindPopup(`
-                        <b>Delivery #${deliveryId}</b><br>
+                        <b>🚛 Delivery Truck #${deliveryId}</b><br>
                         Location: ${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}<br>
                         Notes: ${data.notes || 'No notes'}<br>
                         Updated: ${new Date().toLocaleTimeString()}
                     `);
-
                 deliveryMarkers[deliveryId] = marker;
             }
 
-            // Update delivery data
+            // Оновлюємо дані
             if (deliveryData[deliveryId]) {
                 deliveryData[deliveryId].currentLatitude = data.latitude;
                 deliveryData[deliveryId].currentLongitude = data.longitude;

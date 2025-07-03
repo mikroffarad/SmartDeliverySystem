@@ -235,8 +235,23 @@ namespace SmartDeliverySystem.Services
             delivery.DriverId = dto.DriverId;
             delivery.GpsTrackerId = dto.GpsTrackerId;
             delivery.Type = dto.DeliveryType;
-            delivery.Status = DeliveryStatus.Assigned;
+            delivery.Status = DeliveryStatus.InTransit; // Статус: в дорозі після призначення водія
             delivery.AssignedAt = DateTime.UtcNow;
+            // Встановлюємо початкові координати GPS-трекера на координати вендора
+            delivery.CurrentLatitude = delivery.FromLatitude;
+            delivery.CurrentLongitude = delivery.FromLongitude;
+            delivery.LastLocationUpdate = DateTime.UtcNow;
+            // Додаємо запис у історію переміщень
+            var locationHistory = new DeliveryLocationHistory
+            {
+                DeliveryId = deliveryId,
+                Latitude = delivery.FromLatitude ?? 0,
+                Longitude = delivery.FromLongitude ?? 0,
+                Timestamp = DateTime.UtcNow,
+                Notes = "Початок доставки (від вендора)",
+                Speed = 0
+            };
+            _context.DeliveryLocationHistory.Add(locationHistory);
             await _context.SaveChangesAsync();
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId} with GPS tracker {GpsTrackerId}",
                 dto.DriverId, deliveryId, dto.GpsTrackerId);
@@ -271,7 +286,8 @@ namespace SmartDeliverySystem.Services
             // Якщо координати співпадають з координатами магазину — завершити доставку
             if (delivery.ToLatitude.HasValue && delivery.ToLongitude.HasValue &&
                 Math.Abs(delivery.ToLatitude.Value - locationUpdate.Latitude) < 0.0005 &&
-                Math.Abs(delivery.ToLongitude.Value - locationUpdate.Longitude) < 0.0005)
+                Math.Abs(delivery.ToLongitude.Value - locationUpdate.Longitude) < 0.0005 &&
+                delivery.Status == DeliveryStatus.InTransit)
             {
                 delivery.Status = DeliveryStatus.Delivered;
                 if (delivery.DeliveredAt == null)
@@ -320,6 +336,10 @@ namespace SmartDeliverySystem.Services
                 FromLongitude = delivery.FromLongitude,
                 ToLatitude = delivery.ToLatitude,
                 ToLongitude = delivery.ToLongitude,
+                VendorLatitude = delivery.FromLatitude, // Додаємо координати вендора
+                VendorLongitude = delivery.FromLongitude, // Додаємо координати вендора
+                StoreLatitude = delivery.ToLatitude, // Додаємо координати магазину
+                StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
                 LocationHistory = locationHistory
             };
         }
