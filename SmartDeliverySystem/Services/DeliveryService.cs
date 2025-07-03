@@ -56,7 +56,7 @@ namespace SmartDeliverySystem.Services
                 VendorId = request.VendorId,
                 StoreId = bestStore.Id,
                 TotalAmount = totalAmount,
-                Status = DeliveryStatus.Pending,
+                Status = DeliveryStatus.PendingPayment, // Статус: очікується оплата
                 FromLatitude = fromLat,
                 FromLongitude = fromLon,
                 ToLatitude = toLat,
@@ -229,22 +229,17 @@ namespace SmartDeliverySystem.Services
             var delivery = await _context.Deliveries.FindAsync(deliveryId);
             if (delivery == null)
                 return false;
-
+            if (delivery.Status != DeliveryStatus.Paid)
+                throw new InvalidOperationException("Delivery must be paid before assigning driver");
             // Assign driver details
             delivery.DriverId = dto.DriverId;
             delivery.GpsTrackerId = dto.GpsTrackerId;
             delivery.Type = dto.DeliveryType;
             delivery.Status = DeliveryStatus.Assigned;
             delivery.AssignedAt = DateTime.UtcNow;
-
-            // Coordinates are already set when delivery was created, no need to update them
-            // FromLatitude, FromLongitude, ToLatitude, ToLongitude were set in CreateDeliveryAsync
-
             await _context.SaveChangesAsync();
-
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId} with GPS tracker {GpsTrackerId}",
                 dto.DriverId, deliveryId, dto.GpsTrackerId);
-
             return true;
         }
 
@@ -272,6 +267,17 @@ namespace SmartDeliverySystem.Services
             };
 
             _context.DeliveryLocationHistory.Add(locationHistory);
+
+            // Якщо координати співпадають з координатами магазину — завершити доставку
+            if (delivery.ToLatitude.HasValue && delivery.ToLongitude.HasValue &&
+                Math.Abs(delivery.ToLatitude.Value - locationUpdate.Latitude) < 0.0005 &&
+                Math.Abs(delivery.ToLongitude.Value - locationUpdate.Longitude) < 0.0005)
+            {
+                delivery.Status = DeliveryStatus.Delivered;
+                if (delivery.DeliveredAt == null)
+                    delivery.DeliveredAt = DateTime.UtcNow;
+            }
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Location updated for delivery {DeliveryId}: {Lat}, {Lon}",

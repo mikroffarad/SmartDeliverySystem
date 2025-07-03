@@ -86,7 +86,7 @@
 
         // SignalR connection
         const connection = new signalR.HubConnectionBuilder()
-            .withUrl("https://localhost:7183/deliveryHub")
+            .withUrl("http://localhost:5145/deliveryHub")
             .configureLogging(signalR.LogLevel.Information)
             .build();
 
@@ -112,7 +112,7 @@
         // Load active deliveries from API
         async function loadActiveDeliveries() {
             try {
-                const response = await fetch('https://localhost:7183/api/delivery/active');
+                const response = await fetch('http://localhost:5145/api/delivery/active');
                 const deliveries = await response.json();
 
                 deliveries.forEach(delivery => {

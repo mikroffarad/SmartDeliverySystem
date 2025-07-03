@@ -2,12 +2,12 @@
 {
     public enum DeliveryStatus
     {
-        Pending,
-        Assigned,
-        InTransit,
-        Delivered,
-        Cancelled,
-        Paid
+        PendingPayment, // Очікується оплата
+        Paid,           // Оплачено
+        Assigned,       // Водій призначений
+        InTransit,      // В дорозі
+        Delivered,      // Доставлено
+        Cancelled       // Скасовано
     }
 
     public enum DeliveryType
@@ -29,7 +29,7 @@
 
         public List<DeliveryProduct> Products { get; set; } = new();
 
-        public DeliveryStatus Status { get; set; } = DeliveryStatus.Pending;
+        public DeliveryStatus Status { get; set; } = DeliveryStatus.PendingPayment;
 
         public DeliveryType Type { get; set; } = DeliveryType.Standard;
 
