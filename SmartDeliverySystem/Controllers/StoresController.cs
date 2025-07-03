@@ -6,6 +6,7 @@ using SmartDeliverySystem.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace SmartDeliverySystem.Controllers
 {
@@ -27,6 +28,24 @@ namespace SmartDeliverySystem.Controllers
         public async Task<ActionResult<IEnumerable<Store>>> GetStores()
         {
             return Ok(await _context.Stores.ToListAsync());
+        }
+
+        [HttpGet("map")]
+        public async Task<ActionResult> GetStoresForMap()
+        {
+            var stores = await _context.Stores
+                .Where(s => s.Latitude != 0 && s.Longitude != 0)
+                .Select(s => new
+                {
+                    id = s.Id,
+                    name = s.Name,
+                    address = s.Address,
+                    latitude = s.Latitude,
+                    longitude = s.Longitude
+                })
+                .ToListAsync();
+
+            return Ok(stores);
         }
 
         [HttpGet("{id}")]

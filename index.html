@@ -78,21 +78,19 @@
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Store delivery markers
+        }).addTo(map);        // Store delivery markers
         const deliveryMarkers = {};
         const vendorMarkers = {};
         const storeMarkers = {};
         const deliveryData = {};
+        const addedVendors = new Set();
+        const addedStores = new Set();
 
         // SignalR connection
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("https://localhost:7183/deliveryHub")
             .configureLogging(signalR.LogLevel.Information)
-            .build();
-
-        // Connect to SignalR
+            .build();        // Connect to SignalR
         connection.start().then(function () {
             console.log("✅ Connected to SignalR Hub");
             document.getElementById('connection-status').innerHTML = '🟢 Connected';
@@ -100,6 +98,9 @@
 
             // Load existing deliveries
             loadActiveDeliveries();
+            // Load all vendors and stores
+            loadAllVendors();
+            loadAllStores();
         }).catch(function (err) {
             console.error("❌ SignalR Error: " + err.toString());
             document.getElementById('connection-status').innerHTML = '🔴 Connection failed';
@@ -115,15 +116,80 @@
                 const response = await fetch('https://localhost:7183/api/delivery/tracking/active');
                 const deliveries = await response.json();
 
-                deliveries.forEach(delivery => {
+                console.log('📦 Loaded deliveries:', deliveries);
+                console.log('📦 Number of deliveries:', deliveries.length);
+
+                deliveries.forEach((delivery, index) => {
+                    console.log(`\n=== Processing delivery ${index + 1} ===`);
+                    console.log('Full delivery object:', delivery); console.log(`Vendor coordinates: lat=${delivery.vendorLatitude}, lng=${delivery.vendorLongitude}`);
+                    console.log(`Store coordinates: lat=${delivery.storeLatitude}, lng=${delivery.storeLongitude}`);
+                    console.log(`From coordinates: lat=${delivery.fromLatitude}, lng=${delivery.fromLongitude}`);
+                    console.log(`To coordinates: lat=${delivery.toLatitude}, lng=${delivery.toLongitude}`);
+
                     addDeliveryToMap(delivery);
+                    // Додаємо вендора на карту (уникаємо дублювання)
+                    const vendorLat = delivery.vendorLatitude || delivery.fromLatitude;
+                    const vendorLng = delivery.vendorLongitude || delivery.fromLongitude;
+
+                    if (vendorLat && vendorLng) {
+                        const vendorKey = `${vendorLat}_${vendorLng}`;
+                        if (!addedVendors.has(vendorKey)) {
+                            console.log('🏭 Adding vendor:', vendorLat, vendorLng);
+                            const factoryIcon = L.icon({
+                                iconUrl: 'https://cdn-icons-png.flaticon.com/512/1076/1076471.png',
+                                iconSize: [28, 28]
+                            });
+                            const vendorMarker = L.marker([vendorLat, vendorLng], { icon: factoryIcon })
+                                .addTo(map)
+                                .bindPopup(`<b>🏭 Vendor/Factory</b><br>Start Point<br>Lat: ${vendorLat.toFixed(4)}<br>Lon: ${vendorLng.toFixed(4)}`);
+                            vendorMarkers[vendorKey] = vendorMarker;
+                            addedVendors.add(vendorKey);
+                        } else {
+                            console.log('🏭 Vendor already exists:', vendorLat, vendorLng);
+                        }
+                    } else {
+                        console.log('⚠️ No vendor coordinates for delivery:', delivery.deliveryId);
+                        console.log('  vendorLatitude:', delivery.vendorLatitude);
+                        console.log('  vendorLongitude:', delivery.vendorLongitude);
+                        console.log('  fromLatitude:', delivery.fromLatitude);
+                        console.log('  fromLongitude:', delivery.fromLongitude);
+                    }
+
+                    // Додаємо магазин на карту (уникаємо дублювання)
+                    const storeLat = delivery.storeLatitude || delivery.toLatitude;
+                    const storeLng = delivery.storeLongitude || delivery.toLongitude;
+
+                    if (storeLat && storeLng) {
+                        const storeKey = `${storeLat}_${storeLng}`;
+                        if (!addedStores.has(storeKey)) {
+                            console.log('🏪 Adding store:', storeLat, storeLng);
+                            const storeIcon = L.icon({
+                                iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
+                                iconSize: [28, 28]
+                            });
+                            const storeMarker = L.marker([storeLat, storeLng], { icon: storeIcon })
+                                .addTo(map)
+                                .bindPopup(`<b>🏪 Store</b><br>Destination<br>Lat: ${storeLat.toFixed(4)}<br>Lon: ${storeLng.toFixed(4)}`);
+                            storeMarkers[storeKey] = storeMarker;
+                            addedStores.add(storeKey);
+                        } else {
+                            console.log('🏪 Store already exists:', storeLat, storeLng);
+                        }
+                    } else {
+                        console.log('⚠️ No store coordinates for delivery:', delivery.deliveryId);
+                        console.log('  storeLatitude:', delivery.storeLatitude);
+                        console.log('  storeLongitude:', delivery.storeLongitude);
+                        console.log('  toLatitude:', delivery.toLatitude);
+                        console.log('  toLongitude:', delivery.toLongitude);
+                    }
                 });
 
+                console.log(`✅ Added ${addedVendors.size} vendors and ${addedStores.size} stores to map`);
                 updateDeliveriesList();
             } catch (error) {
-                console.error('Error loading deliveries:', error);
+                console.error('❌ Error loading deliveries:', error);
             }
-        }        // Add delivery to map
+        }// Add delivery to map
         function addDeliveryToMap(delivery) {
             // Маркер GPS-трекера (вантажівка водія)
             if (delivery.currentLatitude && delivery.currentLongitude) {
@@ -141,32 +207,8 @@
                     `);
                 deliveryMarkers[delivery.deliveryId] = marker;
             }
-            // Маркер вендора (завод/склад)
-            if (delivery.vendorLatitude && delivery.vendorLongitude) {
-                if (vendorMarkers[delivery.deliveryId]) map.removeLayer(vendorMarkers[delivery.deliveryId]);
-                const factoryIcon = L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1076/1076471.png',
-                    iconSize: [28, 28]
-                });
-                const vendorMarker = L.marker([delivery.vendorLatitude, delivery.vendorLongitude], { icon: factoryIcon })
-                    .addTo(map)
-                    .bindPopup(`<b>🏭 Vendor/Factory</b><br>Start Point<br>Lat: ${delivery.vendorLatitude.toFixed(4)}<br>Lon: ${delivery.vendorLongitude.toFixed(4)}`);
-                vendorMarkers[delivery.deliveryId] = vendorMarker;
-            }
-            // Маркер магазину (кінцева точка)
-            if (delivery.storeLatitude && delivery.storeLongitude) {
-                if (storeMarkers[delivery.deliveryId]) map.removeLayer(storeMarkers[delivery.deliveryId]);
-                const storeIcon = L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
-                    iconSize: [28, 28]
-                });
-                const storeMarker = L.marker([delivery.storeLatitude, delivery.storeLongitude], { icon: storeIcon })
-                    .addTo(map)
-                    .bindPopup(`<b>🏪 Store</b><br>Destination<br>Lat: ${delivery.storeLatitude.toFixed(4)}<br>Lon: ${delivery.storeLongitude.toFixed(4)}`);
-                storeMarkers[delivery.deliveryId] = storeMarker;
-            }
             deliveryData[delivery.deliveryId] = delivery;
-        }        // Update delivery position
+        }// Update delivery position
         function updateDeliveryOnMap(data) {
             const deliveryId = data.deliveryId;
 
@@ -235,6 +277,68 @@
 
                 list.appendChild(div);
             });
+        }        // Load all vendors from API
+        async function loadAllVendors() {
+            try {
+                const response = await fetch('https://localhost:7183/api/vendors/map');
+                const vendors = await response.json();
+
+                console.log('🏭 Loaded vendors:', vendors);
+
+                vendors.forEach(vendor => {
+                    if (vendor.latitude && vendor.longitude) {
+                        const vendorKey = `${vendor.latitude}_${vendor.longitude}`;
+                        if (!addedVendors.has(vendorKey)) {
+                            console.log('🏭 Adding vendor:', vendor.name, vendor.latitude, vendor.longitude);
+                            const factoryIcon = L.icon({
+                                iconUrl: 'https://cdn-icons-png.flaticon.com/512/1076/1076471.png',
+                                iconSize: [28, 28]
+                            });
+                            const vendorMarker = L.marker([vendor.latitude, vendor.longitude], { icon: factoryIcon })
+                                .addTo(map)
+                                .bindPopup(`<b>🏭 ${vendor.name}</b><br>Vendor/Factory<br>Address: ${vendor.address}<br>Lat: ${vendor.latitude.toFixed(4)}<br>Lon: ${vendor.longitude.toFixed(4)}`);
+                            vendorMarkers[vendorKey] = vendorMarker;
+                            addedVendors.add(vendorKey);
+                        }
+                    }
+                });
+
+                console.log(`✅ Added ${vendors.length} vendors to map`);
+            } catch (error) {
+                console.error('❌ Error loading vendors:', error);
+            }
+        }
+
+        // Load all stores from API
+        async function loadAllStores() {
+            try {
+                const response = await fetch('https://localhost:7183/api/stores/map');
+                const stores = await response.json();
+
+                console.log('🏪 Loaded stores:', stores);
+
+                stores.forEach(store => {
+                    if (store.latitude && store.longitude) {
+                        const storeKey = `${store.latitude}_${store.longitude}`;
+                        if (!addedStores.has(storeKey)) {
+                            console.log('🏪 Adding store:', store.name, store.latitude, store.longitude);
+                            const storeIcon = L.icon({
+                                iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
+                                iconSize: [28, 28]
+                            });
+                            const storeMarker = L.marker([store.latitude, store.longitude], { icon: storeIcon })
+                                .addTo(map)
+                                .bindPopup(`<b>🏪 ${store.name}</b><br>Store<br>Address: ${store.address}<br>Lat: ${store.latitude.toFixed(4)}<br>Lon: ${store.longitude.toFixed(4)}`);
+                            storeMarkers[storeKey] = storeMarker;
+                            addedStores.add(storeKey);
+                        }
+                    }
+                });
+
+                console.log(`✅ Added ${stores.length} stores to map`);
+            } catch (error) {
+                console.error('❌ Error loading stores:', error);
+            }
         }
     </script>
 </body>

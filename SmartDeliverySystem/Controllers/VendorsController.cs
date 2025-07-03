@@ -30,6 +30,23 @@ namespace SmartDeliverySystem.Controllers
             var result = _mapper.Map<List<VendorWithProductsDto>>(vendors);
             return Ok(result);
         }
+        [HttpGet("map")]
+        public async Task<ActionResult> GetVendorsForMap()
+        {
+            var vendors = await _context.Vendors
+                .Where(v => v.Latitude != 0 && v.Longitude != 0)
+                .Select(v => new
+                {
+                    id = v.Id,
+                    name = v.Name,
+                    address = v.Address,
+                    latitude = v.Latitude,
+                    longitude = v.Longitude
+                })
+                .ToListAsync();
+
+            return Ok(vendors);
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Vendor>> GetVendor(int id)
