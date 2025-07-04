@@ -31,8 +31,6 @@ namespace SmartDeliverySystem.Controllers
             var vendor = new Vendor
             {
                 Name = "Київський Продуктовий Центр",
-                ContactEmail = "info@kyivproducts.com",
-                Address = "вул. Хрещатик, 22, Київ",
                 Latitude = 50.4501,
                 Longitude = 30.5234
             };
@@ -42,16 +40,16 @@ namespace SmartDeliverySystem.Controllers
             // 10 магазинів у різних районах Києва
             var stores = new List<Store>
             {
-                new Store { Name = "Магазин Центр", Address = "вул. Хрещатик, 1, Київ", Latitude = 50.4501, Longitude = 30.5234, IsActive = true },
-                new Store { Name = "Магазин Оболонь", Address = "просп. Оболонський, 15, Київ", Latitude = 50.5168, Longitude = 30.4982, IsActive = true },
-                new Store { Name = "Магазин Позняки", Address = "вул. Драгоманова, 10, Київ", Latitude = 50.3975, Longitude = 30.6290, IsActive = true },
-                new Store { Name = "Магазин Лівобережна", Address = "вул. Раїси Окіпної, 2, Київ", Latitude = 50.4502, Longitude = 30.6090, IsActive = true },
-                new Store { Name = "Магазин Теремки", Address = "просп. Академіка Глушкова, 42, Київ", Latitude = 50.3740, Longitude = 30.4760, IsActive = true },
-                new Store { Name = "Магазин Виноградар", Address = "просп. Свободи, 32, Київ", Latitude = 50.4880, Longitude = 30.3900, IsActive = true },
-                new Store { Name = "Магазин Троєщина", Address = "вул. Маяковського, 17, Київ", Latitude = 50.5160, Longitude = 30.6010, IsActive = true },
-                new Store { Name = "Магазин Солом'янка", Address = "вул. Солом'янська, 22, Київ", Latitude = 50.4310, Longitude = 30.4710, IsActive = true },
-                new Store { Name = "Магазин Святошин", Address = "просп. Перемоги, 102, Київ", Latitude = 50.4570, Longitude = 30.3560, IsActive = true },
-                new Store { Name = "Магазин Дарниця", Address = "вул. Бориспільська, 12, Київ", Latitude = 50.4310, Longitude = 30.6510, IsActive = true }
+                new Store { Name = "Магазин Центр", Latitude = 50.4501, Longitude = 30.5234},
+                new Store { Name = "Магазин Оболонь", Latitude = 50.5168, Longitude = 30.4982},
+                new Store { Name = "Магазин Позняки", Latitude = 50.3975, Longitude = 30.6290},
+                new Store { Name = "Магазин Лівобережна", Latitude = 50.4502, Longitude = 30.6090},
+                new Store { Name = "Магазин Теремки", Latitude = 50.3740, Longitude = 30.4760},
+                new Store { Name = "Магазин Виноградар", Latitude = 50.4880, Longitude = 30.3900},
+                new Store { Name = "Магазин Троєщина", Latitude = 50.5160, Longitude = 30.6010},
+                new Store { Name = "Магазин Солом'янка", Latitude = 50.4310, Longitude = 30.4710},
+                new Store { Name = "Магазин Святошин", Latitude = 50.4570, Longitude = 30.3560},
+                new Store { Name = "Магазин Дарниця", Latitude = 50.4310, Longitude = 30.6510}
             };
             _context.Stores.AddRange(stores);
             await _context.SaveChangesAsync();

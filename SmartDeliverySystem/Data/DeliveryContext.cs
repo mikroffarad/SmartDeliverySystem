@@ -37,7 +37,6 @@ namespace SmartDeliverySystem.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200);
-                entity.Property(e => e.Address).HasMaxLength(500);
             });
 
             // Vendor configuration
@@ -45,8 +44,6 @@ namespace SmartDeliverySystem.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200);
-                entity.Property(e => e.ContactEmail).HasMaxLength(250);
-                entity.Property(e => e.Address).HasMaxLength(500);
             });
 
             // Delivery configuration

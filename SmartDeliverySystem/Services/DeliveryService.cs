@@ -82,7 +82,6 @@ namespace SmartDeliverySystem.Services
                 DeliveryId = delivery.Id,
                 StoreId = bestStore.Id,
                 StoreName = bestStore.Name,
-                StoreAddress = bestStore.Address,
                 TotalAmount = totalAmount,
                 EstimatedDeliveryTime = "2-3 hours" // Static so far
             };
@@ -95,7 +94,6 @@ namespace SmartDeliverySystem.Services
                 throw new ArgumentException("Vendor not found");
 
             var activeStores = await _context.Stores
-                .Where(s => s.IsActive)
                 .ToListAsync();
 
             if (!activeStores.Any())

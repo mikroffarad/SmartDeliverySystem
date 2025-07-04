@@ -39,7 +39,6 @@ namespace SmartDeliverySystem.Controllers
                 {
                     id = v.Id,
                     name = v.Name,
-                    address = v.Address,
                     latitude = v.Latitude,
                     longitude = v.Longitude
                 })
@@ -60,7 +59,6 @@ namespace SmartDeliverySystem.Controllers
             var result = _mapper.Map<VendorWithProductsDto>(vendor);
             return Ok(result);
         }
-
         [HttpPost]
         public async Task<ActionResult<Vendor>> CreateVendor([FromBody] VendorDto dto)
         {
@@ -69,15 +67,12 @@ namespace SmartDeliverySystem.Controllers
 
             if (await _context.Vendors.AnyAsync(v => v.Name == dto.Name))
                 return BadRequest($"Vendor with name '{dto.Name}' already exists.");
-            if (await _context.Vendors.AnyAsync(v => v.ContactEmail == dto.ContactEmail))
-                return BadRequest($"Vendor with email '{dto.ContactEmail}' already exists.");
 
             var vendor = _mapper.Map<Vendor>(dto);
             _context.Vendors.Add(vendor);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetVendor), new { id = vendor.Id }, vendor);
         }
-
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateVendor(int id, [FromBody] VendorDto dto)
         {
@@ -89,8 +84,6 @@ namespace SmartDeliverySystem.Controllers
 
             if (await _context.Vendors.AnyAsync(v => v.Id != id && v.Name == dto.Name))
                 return BadRequest($"Vendor with name '{dto.Name}' already exists.");
-            if (await _context.Vendors.AnyAsync(v => v.Id != id && v.ContactEmail == dto.ContactEmail))
-                return BadRequest($"Vendor with email '{dto.ContactEmail}' already exists.");
 
             _mapper.Map(dto, vendor);
             await _context.SaveChangesAsync();

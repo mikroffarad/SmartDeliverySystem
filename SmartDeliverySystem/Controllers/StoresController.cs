@@ -29,7 +29,6 @@ namespace SmartDeliverySystem.Controllers
         {
             return Ok(await _context.Stores.ToListAsync());
         }
-
         [HttpGet("map")]
         public async Task<ActionResult> GetStoresForMap()
         {
@@ -39,7 +38,6 @@ namespace SmartDeliverySystem.Controllers
                 {
                     id = s.Id,
                     name = s.Name,
-                    address = s.Address,
                     latitude = s.Latitude,
                     longitude = s.Longitude
                 })

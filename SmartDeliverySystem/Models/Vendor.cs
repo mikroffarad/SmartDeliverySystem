@@ -10,16 +10,11 @@ namespace SmartDeliverySystem.Models
         [Required]
         public string Name { get; set; } = string.Empty;
 
-        [Required]
-        public string ContactEmail { get; set; } = string.Empty;
-
-        public string Address { get; set; } = string.Empty;
-
         public double Latitude { get; set; }
 
         public double Longitude { get; set; }
 
         [JsonIgnore]
-        public ICollection<Product> Products { get; set; }
+        public ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }

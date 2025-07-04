@@ -4,9 +4,7 @@ namespace SmartDeliverySystem.DTOs
 {
     public class VendorDto
     {
-        public string Name { get; set; }
-        public string ContactEmail { get; set; }
-        public string Address { get; set; }
+        public string Name { get; set; } = string.Empty;
         public double Latitude { get; set; }
         public double Longitude { get; set; }
     }
@@ -14,11 +12,9 @@ namespace SmartDeliverySystem.DTOs
     public class VendorWithProductsDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string ContactEmail { get; set; }
-        public string Address { get; set; }
+        public string Name { get; set; } = string.Empty;
         public double Latitude { get; set; }
         public double Longitude { get; set; }
-        public List<Product> Products { get; set; }
+        public List<Product> Products { get; set; } = new();
     }
 }
