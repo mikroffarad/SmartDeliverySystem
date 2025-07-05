@@ -10,13 +10,6 @@
         Cancelled       // Скасовано
     }
 
-    public enum DeliveryType
-    {
-        Standard,
-        Express,
-        SameDay
-    }
-
     public class Delivery
     {
         public int Id { get; set; }
@@ -30,8 +23,6 @@
         public List<DeliveryProduct> Products { get; set; } = new();
 
         public DeliveryStatus Status { get; set; } = DeliveryStatus.PendingPayment;
-
-        public DeliveryType Type { get; set; } = DeliveryType.Standard;
 
         public string? DriverId { get; set; }
 

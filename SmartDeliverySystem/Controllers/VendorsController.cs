@@ -46,9 +46,8 @@ namespace SmartDeliverySystem.Controllers
 
             return Ok(vendors);
         }
-
         [HttpGet("{id}")]
-        public async Task<ActionResult<Vendor>> GetVendor(int id)
+        public async Task<ActionResult<VendorWithProductsDto>> GetVendor(int id)
         {
             var vendor = await _context.Vendors
                 .Include(v => v.Products)

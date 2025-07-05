@@ -83,7 +83,71 @@ namespace SmartDeliverySystem.Services
                 StoreId = bestStore.Id,
                 StoreName = bestStore.Name,
                 TotalAmount = totalAmount,
-                EstimatedDeliveryTime = "2-3 hours" // Static so far
+            };
+        }
+
+        public async Task<DeliveryResponseDto> CreateDeliveryManualAsync(DeliveryRequestManualDto request)
+        {
+            _logger.LogInformation("Creating manual delivery for vendor {VendorId} to store {StoreId}",
+                request.VendorId, request.StoreId);
+
+            // Check that all products belong to the vendor
+            var productIds = request.Products.Select(p => p.ProductId).ToList();
+            var vendorProductIds = await _context.Products
+                .Where(p => p.VendorId == request.VendorId && productIds.Contains(p.Id))
+                .Select(p => p.Id)
+                .ToListAsync();
+
+            if (vendorProductIds.Count != productIds.Count)
+            {
+                _logger.LogWarning("One or more products do not belong to vendor {VendorId}", request.VendorId);
+                throw new InvalidOperationException("One or more products do not belong to the vendor.");
+            }
+
+            // Validate that the selected store exists
+            var store = await _context.Stores.FindAsync(request.StoreId);
+            if (store == null)
+                throw new InvalidOperationException($"Store with ID {request.StoreId} not found.");
+
+            // Calculate total amount
+            var totalAmount = await CalculateTotalAmountAsync(request.Products);
+
+            // Get vendor and store coordinates
+            var vendor = await _context.Vendors.FindAsync(request.VendorId);
+            double? fromLat = vendor?.Latitude;
+            double? fromLon = vendor?.Longitude;
+            double? toLat = store.Latitude;
+            double? toLon = store.Longitude;            // Create delivery
+            var delivery = new Delivery
+            {
+                VendorId = request.VendorId,
+                StoreId = store.Id,
+                TotalAmount = totalAmount,
+                Status = DeliveryStatus.PendingPayment,
+                FromLatitude = fromLat,
+                FromLongitude = fromLon,
+                ToLatitude = toLat,
+                ToLongitude = toLon
+            };
+
+            _context.Deliveries.Add(delivery);
+            await _context.SaveChangesAsync();
+
+            // Add products to delivery
+            var deliveryProducts = request.Products.Select(p => new DeliveryProduct
+            {
+                DeliveryId = delivery.Id,
+                ProductId = p.ProductId,
+                Quantity = p.Quantity
+            }).ToList();
+
+            _context.DeliveryProducts.AddRange(deliveryProducts);
+            await _context.SaveChangesAsync(); return new DeliveryResponseDto
+            {
+                DeliveryId = delivery.Id,
+                StoreId = store.Id,
+                StoreName = store.Name,
+                TotalAmount = totalAmount,
             };
         }
 
@@ -228,11 +292,9 @@ namespace SmartDeliverySystem.Services
             if (delivery == null)
                 return false;
             if (delivery.Status != DeliveryStatus.Paid)
-                throw new InvalidOperationException("Delivery must be paid before assigning driver");
-            // Assign driver details
+                throw new InvalidOperationException("Delivery must be paid before assigning driver");            // Assign driver details
             delivery.DriverId = dto.DriverId;
             delivery.GpsTrackerId = dto.GpsTrackerId;
-            delivery.Type = dto.DeliveryType;
             delivery.Status = DeliveryStatus.InTransit; // Статус: в дорозі після призначення водія
             delivery.AssignedAt = DateTime.UtcNow;
             // Встановлюємо початкові координати GPS-трекера на координати вендора

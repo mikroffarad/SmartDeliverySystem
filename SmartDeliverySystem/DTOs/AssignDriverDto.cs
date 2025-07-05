@@ -7,6 +7,5 @@ namespace SmartDeliverySystem.DTOs
     {
         public string DriverId { get; set; } = string.Empty;
         public string GpsTrackerId { get; set; } = string.Empty;
-        public DeliveryType DeliveryType { get; set; }
     }
 }

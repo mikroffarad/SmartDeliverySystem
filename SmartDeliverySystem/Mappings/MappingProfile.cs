@@ -12,7 +12,6 @@ namespace SmartDeliverySystem.Mapping
             CreateMap<Vendor, VendorWithProductsDto>();
             CreateMap<VendorDto, Vendor>();
             CreateMap<StoreDto, Store>(); CreateMap<AssignDriverDto, Delivery>()
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.DeliveryType))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(_ => DeliveryStatus.Assigned))
                 .ForMember(dest => dest.AssignedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
                 .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));

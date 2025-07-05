@@ -6,6 +6,7 @@ namespace SmartDeliverySystem.Services
     public interface IDeliveryService
     {
         Task<DeliveryResponseDto> CreateDeliveryAsync(DeliveryRequestDto request);
+        Task<DeliveryResponseDto> CreateDeliveryManualAsync(DeliveryRequestManualDto request);
         Task<Store> FindBestStoreAsync(int vendorId, List<ProductRequestDto> products);
         Task<Delivery?> GetDeliveryAsync(int deliveryId);
         Task<List<Delivery>> GetActiveDeliveriesAsync();

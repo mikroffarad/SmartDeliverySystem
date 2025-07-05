@@ -51,6 +51,53 @@ namespace SmartDeliverySystem.Controllers
 
             return Ok(response);
         }
+        [HttpPost("request-manual")]
+        public async Task<ActionResult<DeliveryResponseDto>> RequestDeliveryManual([FromBody] DeliveryRequestManualDto request)
+        {
+            _logger.LogInformation("Manual delivery request received from vendor {VendorId} to store {StoreId}",
+                request.VendorId, request.StoreId);
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid model state for manual delivery request");
+                return BadRequest(ModelState);
+            }
+
+            if (request.Products == null || !request.Products.Any())
+            {
+                return BadRequest("At least one product is required");
+            }
+
+            try
+            {
+                var response = await _deliveryService.CreateDeliveryManualAsync(request);
+
+                // Send message to Azure Service Bus
+                try
+                {
+                    await _serviceBusService?.SendDeliveryRequestAsync(new
+                    {
+                        DeliveryId = response.DeliveryId,
+                        VendorId = request.VendorId,
+                        StoreId = response.StoreId,
+                        TotalAmount = response.TotalAmount,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    _logger.LogInformation("✅ Manual delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Failed to send manual delivery request to Service Bus");
+                }
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error creating manual delivery request");
+                return BadRequest(ex.Message);
+            }
+        }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<Delivery>> GetDelivery(int id)
