@@ -70,20 +70,25 @@ namespace SmartDeliverySystem.Controllers
 
             try
             {
-                var response = await _deliveryService.CreateDeliveryManualAsync(request);
-
-                // Send message to Azure Service Bus
+                var response = await _deliveryService.CreateDeliveryManualAsync(request);                // Send message to Azure Service Bus
                 try
                 {
-                    await _serviceBusService?.SendDeliveryRequestAsync(new
+                    if (_serviceBusService != null)
                     {
-                        DeliveryId = response.DeliveryId,
-                        VendorId = request.VendorId,
-                        StoreId = response.StoreId,
-                        TotalAmount = response.TotalAmount,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                    _logger.LogInformation("✅ Manual delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                        await _serviceBusService.SendDeliveryRequestAsync(new
+                        {
+                            DeliveryId = response.DeliveryId,
+                            VendorId = request.VendorId,
+                            StoreId = response.StoreId,
+                            TotalAmount = response.TotalAmount,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        _logger.LogInformation("✅ Manual delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Service Bus service is not available");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -138,13 +143,23 @@ namespace SmartDeliverySystem.Controllers
             return Ok();
         }
         [HttpPost("{id}/pay")]
-        public async Task<ActionResult> PayForDelivery(int id, [FromBody] PaymentDto payment)
+        public async Task<ActionResult> ProcessPayment(int id, [FromBody] PaymentDto payment)
         {
-            var result = await _deliveryService.ProcessPaymentAsync(id, payment);
-            if (!result)
-                return NotFound("Payment failed or delivery not found.");
-            _logger.LogInformation("Payment for delivery {DeliveryId} processed", id);
-            return Ok();
+            try
+            {
+                var processed = await _deliveryService.ProcessPaymentAsync(id, payment);
+                if (!processed)
+                    return NotFound("Delivery not found or already paid");
+
+                _logger.LogInformation("✅ Payment processed for delivery {DeliveryId}: ${Amount} via {PaymentMethod}",
+                    id, payment.Amount, payment.PaymentMethod);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error processing payment for delivery {DeliveryId}", id);
+                return BadRequest(ex.Message);
+            }
         }
         [HttpPost("{id}/update-location")]
         public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)

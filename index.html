@@ -58,6 +58,15 @@
             background-color: #17a2b8;
         }
 
+        .status-paid {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .status-cancelled {
+            background-color: #dc3545;
+        }
+
         .control-buttons {
             position: absolute;
             top: 10px;
@@ -844,9 +853,20 @@
                 deliveryMarkers[delivery.deliveryId] = marker;
             }
             deliveryData[delivery.deliveryId] = delivery;
-        }// Update delivery position
+        }        // Update delivery position
         function updateDeliveryOnMap(data) {
             const deliveryId = data.deliveryId;
+
+            // Check if delivery is delivered and remove truck
+            if (deliveryData[deliveryId] && deliveryData[deliveryId].status === 'Delivered') {
+                if (deliveryMarkers[deliveryId]) {
+                    map.removeLayer(deliveryMarkers[deliveryId]);
+                    delete deliveryMarkers[deliveryId];
+                }
+                delete deliveryData[deliveryId];
+                updateDeliveriesList();
+                return;
+            }
 
             // Оновлюємо маркер GPS-трекера (вантажівки)
             if (deliveryMarkers[deliveryId]) {
@@ -883,9 +903,7 @@
             }
 
             updateDeliveriesList();
-        }
-
-        // Update deliveries list in sidebar
+        }// Update deliveries list in sidebar
         function updateDeliveriesList() {
             const list = document.getElementById('deliveries-list');
             list.innerHTML = '';
@@ -893,27 +911,140 @@
             Object.keys(deliveryData).forEach(deliveryId => {
                 const delivery = deliveryData[deliveryId];
                 const div = document.createElement('div');
+
+                // Ensure status is a string and handle potential null/undefined values
+                const status = delivery.status ? String(delivery.status).toLowerCase() : 'pending';                // Add delivery status management buttons
+                let statusButtons = '';
+                if (delivery.status === 'InTransit') {
+                    statusButtons = `
+                        <button onclick="markAsDelivered(${deliveryId})"
+                                style="background: #28a745; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px;">
+                            ✅ Mark Delivered
+                        </button>
+                        <button onclick="moveTruckToStore(${deliveryId})"
+                                style="background: #007bff; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px;">
+                            🎯 Move to Store
+                        </button>
+                    `;
+                }
+
                 div.innerHTML = `
-                    <div class="delivery-status status-${delivery.status?.toLowerCase() || 'pending'}">
+                    <div class="delivery-status status-${status}">
                         Delivery #${deliveryId} - ${delivery.status || 'Pending'}
                     </div>
                     <small>Driver: ${delivery.driverId || 'Not assigned'}</small><br>
                     <small>Last update: ${delivery.lastLocationUpdate ?
                         new Date(delivery.lastLocationUpdate).toLocaleTimeString() : 'Never'}</small>
+                    ${statusButtons}
                     <hr>
                 `;
 
                 div.style.cursor = 'pointer';
-                div.onclick = () => {
-                    if (deliveryMarkers[deliveryId]) {
-                        map.setView(deliveryMarkers[deliveryId].getLatLng(), 15);
-                        deliveryMarkers[deliveryId].openPopup();
+                div.onclick = (e) => {
+                    // Don't trigger map view if clicking on buttons
+                    if (e.target.tagName !== 'BUTTON') {
+                        if (deliveryMarkers[deliveryId]) {
+                            map.setView(deliveryMarkers[deliveryId].getLatLng(), 15);
+                            deliveryMarkers[deliveryId].openPopup();
+                        }
                     }
                 };
 
                 list.appendChild(div);
             });
-        }        // Load all vendors from API
+        }        // Mark delivery as delivered function
+        async function markAsDelivered(deliveryId) {
+            if (!confirm(`Mark delivery #${deliveryId} as delivered? This will add products to store inventory.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://localhost:7183/api/delivery/${deliveryId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(4) // 4 = Delivered enum value
+                });
+
+                if (response.ok) {
+                    console.log('✅ Delivery marked as delivered successfully');
+                    alert(`✅ Delivery #${deliveryId} has been marked as delivered!\n\n📦 Products have been added to store inventory.`);
+
+                    // Remove truck marker from map
+                    if (deliveryMarkers[deliveryId]) {
+                        map.removeLayer(deliveryMarkers[deliveryId]);
+                        delete deliveryMarkers[deliveryId];
+                    }
+
+                    // Remove from local data
+                    if (deliveryData[deliveryId]) {
+                        delete deliveryData[deliveryId];
+                    }
+
+                    // Refresh deliveries list and reload active deliveries
+                    updateDeliveriesList();
+                    loadActiveDeliveries(); // This will update the data from server
+
+                } else {
+                    const error = await response.text();
+                    alert(`Error marking delivery as delivered: ${error}`);
+                }
+            } catch (error) {
+                console.error('Error marking delivery as delivered:', error);
+                alert('Error marking delivery as delivered. Please try again.');
+            }
+        }
+
+        // Move truck to store for testing function
+        async function moveTruckToStore(deliveryId) {
+            if (!confirm(`Move truck for delivery #${deliveryId} to destination store? This will simulate arrival.`)) {
+                return;
+            }
+
+            try {
+                // Get delivery data to get destination coordinates
+                const delivery = deliveryData[deliveryId];
+                if (!delivery) {
+                    alert('Delivery data not found');
+                    return;
+                }
+
+                // Use toLatitude/toLongitude or fall back to store coordinates
+                const destLat = delivery.toLatitude || delivery.storeLatitude;
+                const destLng = delivery.toLongitude || delivery.storeLongitude;
+
+                if (!destLat || !destLng) {
+                    alert('Destination coordinates not found');
+                    return;
+                }
+
+                // Send location update to simulate arrival
+                const locationUpdate = {
+                    latitude: destLat,
+                    longitude: destLng,
+                    speed: 0,
+                    notes: 'Симуляція прибуття до магазину'
+                };
+
+                const response = await fetch(`https://localhost:7183/api/delivery/${deliveryId}/location`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(locationUpdate)
+                });
+
+                if (response.ok) {
+                    console.log(`✅ Truck moved to store for delivery ${deliveryId}`);
+                    alert(`🚛 Truck for delivery #${deliveryId} moved to destination store!\n\nThis should trigger automatic delivery completion.`);
+                } else {
+                    const error = await response.text();
+                    alert(`Error moving truck: ${error}`);
+                }
+            } catch (error) {
+                console.error('Error moving truck to store:', error);
+                alert('Error moving truck to store. Please try again.');
+            }
+        }
+
+        // Load all vendors from API
         async function loadAllVendors() {
             try {
                 const response = await fetch('https://localhost:7183/api/vendors/map');
@@ -1160,19 +1291,34 @@
             document.getElementById('storeProductsModalTitle').innerText = `Inventory - ${storeName}`;
             document.getElementById('storeProductsModal').style.display = 'block';
             await loadStoreInventory(storeId);
-        }
-
-        async function loadStoreInventory(storeId) {
+        } async function loadStoreInventory(storeId) {
             try {
-                // For now, we'll show a placeholder since we don't have store inventory API yet
-                const tbody = document.getElementById('storeProductsTableBody');
-                tbody.innerHTML = '<tr><td colspan="4">Store inventory will be populated after deliveries</td></tr>';
+                const response = await fetch(`https://localhost:7183/api/stores/${storeId}/inventory`);
+                const inventory = await response.json();
 
-                // TODO: Implement actual store inventory API call when ready
-                // const response = await fetch(`https://localhost:7183/api/stores/${storeId}/inventory`);
-                // const inventory = await response.json();
+                const tbody = document.getElementById('storeProductsTableBody');
+                tbody.innerHTML = '';
+
+                if (inventory && inventory.length > 0) {
+                    inventory.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.productName}</td>
+                            <td>${item.category}</td>
+                            <td>${item.quantity}</td>
+                            <td>$${item.price.toFixed(2)}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+
+                    console.log(`📋 Loaded ${inventory.length} products in store inventory`);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4">No products in inventory yet. Products will appear after deliveries are completed.</td></tr>';
+                }
             } catch (error) {
                 console.error('Error loading store inventory:', error);
+                const tbody = document.getElementById('storeProductsTableBody');
+                tbody.innerHTML = '<tr><td colspan="4">Error loading inventory. Please try again.</td></tr>';
             }
         }
 
@@ -1530,3 +1676,4 @@
 </body>
 
 </html>
+``` 

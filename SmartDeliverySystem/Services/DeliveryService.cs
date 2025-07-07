@@ -217,41 +217,145 @@ namespace SmartDeliverySystem.Services
                 .Include(d => d.Store)
                 .Where(d => d.Status != DeliveryStatus.Delivered && d.Status != DeliveryStatus.Cancelled)
                 .ToListAsync();
-        }
-
-        public async Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status)
+        }        public async Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status)
         {
-            var delivery = await _context.Deliveries.FindAsync(deliveryId);
-            if (delivery == null)
-                return false;
+            var delivery = await _context.Deliveries
+                .Include(d => d.Products)
+                .ThenInclude(dp => dp.Product)
+                .FirstOrDefaultAsync(d => d.Id == deliveryId);
 
+            if (delivery == null) 
+            {
+                _logger.LogWarning("⚠️ Delivery {DeliveryId} not found when trying to update status", deliveryId);
+                return false;
+            }
+
+            var oldStatus = delivery.Status;
             delivery.Status = status;
 
-            if (status == DeliveryStatus.Assigned && delivery.AssignedAt == null)
-                delivery.AssignedAt = DateTime.UtcNow;
+            _logger.LogInformation("🔄 Updating delivery {DeliveryId} status from {OldStatus} to {NewStatus}", 
+                deliveryId, oldStatus, status);
+            _logger.LogInformation("📦 Delivery {DeliveryId} has {ProductCount} products loaded", 
+                deliveryId, delivery.Products?.Count ?? 0);
 
-            if (status == DeliveryStatus.Delivered && delivery.DeliveredAt == null)
+            // If delivery is marked as delivered, add products to store inventory
+            if (status == DeliveryStatus.Delivered && oldStatus != DeliveryStatus.Delivered)
+            {
                 delivery.DeliveredAt = DateTime.UtcNow;
+                
+                // Save delivery status first
+                await _context.SaveChangesAsync(); 
+                
+                // Add products to inventory
+                await AddProductsToStoreInventoryAsync(delivery);
+                
+                _logger.LogInformation("✅ Delivery {DeliveryId} completed and products added to store {StoreId} inventory",
+                    deliveryId, delivery.StoreId);
+            }
+            else
+            {
+                await _context.SaveChangesAsync();
+            }
 
-            await _context.SaveChangesAsync();
             return true;
+        }        private async Task AddProductsToStoreInventoryAsync(Delivery delivery)
+        {
+            _logger.LogInformation("🔄 Starting inventory update for delivery {DeliveryId} to store {StoreId} with {ProductCount} products",
+                delivery.Id, delivery.StoreId, delivery.Products?.Count ?? 0);
+
+            // Debug check - verify products in database
+            await CheckDeliveryProductsAsync(delivery.Id);
+
+            if (delivery.Products == null || !delivery.Products.Any())
+            {
+                _logger.LogWarning("⚠️ Delivery {DeliveryId} has no products to add to inventory", delivery.Id);
+                
+                // Try to load products directly from database
+                var dbProducts = await _context.DeliveryProducts
+                    .Include(dp => dp.Product)
+                    .Where(dp => dp.DeliveryId == delivery.Id)
+                    .ToListAsync();
+                    
+                if (dbProducts.Any())
+                {
+                    _logger.LogInformation("✅ Found {ProductCount} products in database for delivery {DeliveryId}", 
+                        dbProducts.Count, delivery.Id);
+                    
+                    // Process products from database
+                    foreach (var deliveryProduct in dbProducts)
+                    {
+                        await ProcessProductToInventory(delivery.StoreId, deliveryProduct);
+                    }
+                    
+                    var changesCount = await _context.SaveChangesAsync();
+                    _logger.LogInformation("✅ Successfully saved {ChangesCount} inventory changes for delivery {DeliveryId}",
+                        changesCount, delivery.Id);
+                }
+                return;
+            }
+
+            foreach (var deliveryProduct in delivery.Products)
+            {
+                await ProcessProductToInventory(delivery.StoreId, deliveryProduct);
+            }
+            
+            // Save changes after updating inventory
+            try
+            {
+                var changesCount = await _context.SaveChangesAsync();
+                _logger.LogInformation("✅ Successfully saved {ChangesCount} inventory changes for delivery {DeliveryId}",
+                    changesCount, delivery.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to save inventory changes for delivery {DeliveryId}", delivery.Id);
+                throw;
+            }
         }
 
+        private async Task ProcessProductToInventory(int storeId, DeliveryProduct deliveryProduct)
+        {
+            _logger.LogInformation("Processing product {ProductId} with quantity {Quantity}",
+                deliveryProduct.ProductId, deliveryProduct.Quantity);
+
+            var existingInventory = await _context.StoreProducts
+                .FirstOrDefaultAsync(sp => sp.StoreId == storeId && sp.ProductId == deliveryProduct.ProductId);
+
+            if (existingInventory != null)
+            {
+                var oldQuantity = existingInventory.Quantity;
+                existingInventory.Quantity += deliveryProduct.Quantity;
+                _logger.LogInformation("📦 Updated store inventory: Product {ProductName} (ID: {ProductId}) quantity increased from {OldQuantity} to {NewQuantity}",
+                    deliveryProduct.Product?.Name, deliveryProduct.ProductId, oldQuantity, existingInventory.Quantity);
+            }
+            else
+            {
+                var newInventory = new StoreProduct
+                {
+                    StoreId = storeId,
+                    ProductId = deliveryProduct.ProductId,
+                    Quantity = deliveryProduct.Quantity
+                };
+                _context.StoreProducts.Add(newInventory);
+                _logger.LogInformation("📦 Added new product to store inventory: {ProductName} (ID: {ProductId}) with quantity {Quantity}",
+                    deliveryProduct.Product?.Name, deliveryProduct.ProductId, deliveryProduct.Quantity);
+            }
+        }
         public async Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment)
         {
             var delivery = await _context.Deliveries.FindAsync(deliveryId);
             if (delivery == null || delivery.Status == DeliveryStatus.Paid)
                 return false;
 
-            if (delivery.TotalAmount != payment.Amount)
-                throw new InvalidOperationException($"Payment amount mismatch. Expected: {delivery.TotalAmount}, received: {payment.Amount}");
-
+            // Remove strict amount check - allow partial payments or overpayments
             delivery.Status = DeliveryStatus.Paid;
             delivery.PaymentDate = DateTime.UtcNow;
             delivery.PaymentMethod = payment.PaymentMethod;
             delivery.PaidAmount = payment.Amount;
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("✅ Payment processed for delivery {DeliveryId}: ${PaidAmount} (Expected: ${TotalAmount}) via {PaymentMethod}",
+                deliveryId, payment.Amount, delivery.TotalAmount, payment.PaymentMethod);
             return true;
         }
 
@@ -316,11 +420,13 @@ namespace SmartDeliverySystem.Services
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId} with GPS tracker {GpsTrackerId}",
                 dto.DriverId, deliveryId, dto.GpsTrackerId);
             return true;
-        }
-
-        public async Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate)
+        }        public async Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate)
         {
-            var delivery = await _context.Deliveries.FindAsync(deliveryId);
+            var delivery = await _context.Deliveries
+                .Include(d => d.Products)
+                .ThenInclude(dp => dp.Product)
+                .FirstOrDefaultAsync(d => d.Id == deliveryId);
+                
             if (delivery == null)
                 return false;
 
@@ -329,6 +435,14 @@ namespace SmartDeliverySystem.Services
             delivery.CurrentLongitude = locationUpdate.Longitude;
             delivery.LastLocationUpdate = DateTime.UtcNow;
             delivery.TrackingNotes = locationUpdate.Notes;
+
+            // Log current coordinates and destination
+            _logger.LogInformation("📍 Current location: lat={CurrentLat}, lng={CurrentLng}", 
+                locationUpdate.Latitude, locationUpdate.Longitude);
+            _logger.LogInformation("🎯 Destination: lat={DestLat}, lng={DestLng}", 
+                delivery.ToLatitude, delivery.ToLongitude);
+            _logger.LogInformation("📦 Products loaded in delivery: {ProductCount}", 
+                delivery.Products?.Count ?? 0);
 
             // Add to location history
             var locationHistory = new DeliveryLocationHistory
@@ -345,13 +459,34 @@ namespace SmartDeliverySystem.Services
 
             // Якщо координати співпадають з координатами магазину — завершити доставку
             if (delivery.ToLatitude.HasValue && delivery.ToLongitude.HasValue &&
-                Math.Abs(delivery.ToLatitude.Value - locationUpdate.Latitude) < 0.0005 &&
-                Math.Abs(delivery.ToLongitude.Value - locationUpdate.Longitude) < 0.0005 &&
                 delivery.Status == DeliveryStatus.InTransit)
             {
-                delivery.Status = DeliveryStatus.Delivered;
-                if (delivery.DeliveredAt == null)
-                    delivery.DeliveredAt = DateTime.UtcNow;
+                var latDiff = Math.Abs(delivery.ToLatitude.Value - locationUpdate.Latitude);
+                var lngDiff = Math.Abs(delivery.ToLongitude.Value - locationUpdate.Longitude);
+                
+                _logger.LogInformation("🔍 Distance check: latDiff={LatDiff}, lngDiff={LngDiff}, threshold=0.0005", 
+                    latDiff, lngDiff);
+
+                if (latDiff < 0.0005 && lngDiff < 0.0005)
+                {
+                    _logger.LogInformation("🎯 Delivery {DeliveryId} reached destination store. Marking as delivered.", deliveryId);
+
+                    // Save current location first
+                    await _context.SaveChangesAsync();
+
+                    // Mark as delivered (this will trigger inventory update)
+                    var statusUpdated = await UpdateDeliveryStatusAsync(deliveryId, DeliveryStatus.Delivered);
+                    if (statusUpdated)
+                    {
+                        _logger.LogInformation("✅ Delivery {DeliveryId} automatically marked as delivered upon arrival", deliveryId);
+                    }
+                    return true;
+                }
+            }
+            else
+            {
+                _logger.LogInformation("⚠️ Auto-delivery conditions not met: ToLat={ToLat}, ToLng={ToLng}, Status={Status}", 
+                    delivery.ToLatitude, delivery.ToLongitude, delivery.Status);
             }
 
             await _context.SaveChangesAsync();
@@ -402,13 +537,12 @@ namespace SmartDeliverySystem.Services
                 StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
                 LocationHistory = locationHistory
             };
-        }
-
-        public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
+        }        public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
         {
             var activeDeliveries = await _context.Deliveries
                 .Where(d => d.Status == DeliveryStatus.Assigned ||
-                           d.Status == DeliveryStatus.InTransit)
+                           d.Status == DeliveryStatus.InTransit ||
+                           d.Status == DeliveryStatus.Paid) // Include Paid status
                 .ToListAsync();
 
             var trackingList = new List<DeliveryTrackingDto>();
@@ -421,6 +555,29 @@ namespace SmartDeliverySystem.Services
             }
 
             return trackingList;
+        }
+
+        // Debug method to check delivery products
+        public async Task<bool> CheckDeliveryProductsAsync(int deliveryId)
+        {
+            var deliveryProductsCount = await _context.DeliveryProducts
+                .CountAsync(dp => dp.DeliveryId == deliveryId);
+                
+            _logger.LogInformation("🔍 DEBUG: Delivery {DeliveryId} has {ProductCount} products in DeliveryProducts table", 
+                deliveryId, deliveryProductsCount);
+
+            var deliveryProducts = await _context.DeliveryProducts
+                .Include(dp => dp.Product)
+                .Where(dp => dp.DeliveryId == deliveryId)
+                .ToListAsync();
+
+            foreach (var dp in deliveryProducts)
+            {
+                _logger.LogInformation("🔍 DEBUG: Product {ProductId} ({ProductName}) with quantity {Quantity}", 
+                    dp.ProductId, dp.Product?.Name ?? "Unknown", dp.Quantity);
+            }
+
+            return deliveryProductsCount > 0;
         }
     }
 }
