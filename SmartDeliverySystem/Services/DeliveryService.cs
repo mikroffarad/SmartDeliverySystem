@@ -217,12 +217,13 @@ namespace SmartDeliverySystem.Services
                 .Include(d => d.Store)
                 .Where(d => d.Status != DeliveryStatus.Delivered && d.Status != DeliveryStatus.Cancelled)
                 .ToListAsync();
-        }        public async Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status)
+        }
+        public async Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status)
         {
             var delivery = await _context.Deliveries
                 .Include(d => d.Products)
                 .ThenInclude(dp => dp.Product)
-                .FirstOrDefaultAsync(d => d.Id == deliveryId);            if (delivery == null) 
+                .FirstOrDefaultAsync(d => d.Id == deliveryId); if (delivery == null)
             {
                 _logger.LogWarning("Delivery {DeliveryId} not found when trying to update status", deliveryId);
                 return false;
@@ -231,20 +232,20 @@ namespace SmartDeliverySystem.Services
             var oldStatus = delivery.Status;
             delivery.Status = status;
 
-            _logger.LogInformation("Updating delivery {DeliveryId} status from {OldStatus} to {NewStatus}", 
+            _logger.LogInformation("Updating delivery {DeliveryId} status from {OldStatus} to {NewStatus}",
                 deliveryId, oldStatus, status);
 
             // If delivery is marked as delivered, add products to store inventory
             if (status == DeliveryStatus.Delivered && oldStatus != DeliveryStatus.Delivered)
             {
                 delivery.DeliveredAt = DateTime.UtcNow;
-                
+
                 // Save delivery status first
-                await _context.SaveChangesAsync(); 
-                
+                await _context.SaveChangesAsync();
+
                 // Add products to inventory
                 await AddProductsToStoreInventoryAsync(delivery);
-                
+
                 _logger.LogInformation("Delivery {DeliveryId} completed and products added to store {StoreId} inventory",
                     deliveryId, delivery.StoreId);
             }
@@ -254,7 +255,8 @@ namespace SmartDeliverySystem.Services
             }
 
             return true;
-        }        private async Task AddProductsToStoreInventoryAsync(Delivery delivery)
+        }
+        private async Task AddProductsToStoreInventoryAsync(Delivery delivery)
         {
             _logger.LogInformation("Starting inventory update for delivery {DeliveryId} to store {StoreId}",
                 delivery.Id, delivery.StoreId);
@@ -262,24 +264,24 @@ namespace SmartDeliverySystem.Services
             if (delivery.Products == null || !delivery.Products.Any())
             {
                 _logger.LogWarning("Delivery {DeliveryId} has no products to add to inventory", delivery.Id);
-                
+
                 // Try to load products directly from database
                 var dbProducts = await _context.DeliveryProducts
                     .Include(dp => dp.Product)
                     .Where(dp => dp.DeliveryId == delivery.Id)
                     .ToListAsync();
-                    
+
                 if (dbProducts.Any())
                 {
-                    _logger.LogInformation("Found {ProductCount} products in database for delivery {DeliveryId}", 
+                    _logger.LogInformation("Found {ProductCount} products in database for delivery {DeliveryId}",
                         dbProducts.Count, delivery.Id);
-                    
+
                     // Process products from database
                     foreach (var deliveryProduct in dbProducts)
                     {
                         await ProcessProductToInventory(delivery.StoreId, deliveryProduct);
                     }
-                    
+
                     var changesCount = await _context.SaveChangesAsync();
                     _logger.LogInformation("Successfully saved {ChangesCount} inventory changes for delivery {DeliveryId}",
                         changesCount, delivery.Id);
@@ -291,7 +293,7 @@ namespace SmartDeliverySystem.Services
             {
                 await ProcessProductToInventory(delivery.StoreId, deliveryProduct);
             }
-            
+
             // Save changes after updating inventory
             try
             {
@@ -314,7 +316,7 @@ namespace SmartDeliverySystem.Services
             if (existingInventory != null)
             {
                 existingInventory.Quantity += deliveryProduct.Quantity;
-                _logger.LogInformation("Updated inventory for product {ProductId}: +{Quantity}", 
+                _logger.LogInformation("Updated inventory for product {ProductId}: +{Quantity}",
                     deliveryProduct.ProductId, deliveryProduct.Quantity);
             }
             else
@@ -340,7 +342,7 @@ namespace SmartDeliverySystem.Services
             delivery.Status = DeliveryStatus.Paid;
             delivery.PaymentDate = DateTime.UtcNow;
             delivery.PaymentMethod = payment.PaymentMethod;
-            delivery.PaidAmount = payment.Amount;            await _context.SaveChangesAsync();
+            delivery.PaidAmount = payment.Amount; await _context.SaveChangesAsync();
             _logger.LogInformation("Payment processed for delivery {DeliveryId}: ${PaidAmount} (Expected: ${TotalAmount}) via {PaymentMethod}",
                 deliveryId, payment.Amount, delivery.TotalAmount, payment.PaymentMethod);
             return true;
@@ -407,13 +409,14 @@ namespace SmartDeliverySystem.Services
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId} with GPS tracker {GpsTrackerId}",
                 dto.DriverId, deliveryId, dto.GpsTrackerId);
             return true;
-        }        public async Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate)
+        }
+        public async Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate)
         {
             var delivery = await _context.Deliveries
                 .Include(d => d.Products)
                 .ThenInclude(dp => dp.Product)
                 .FirstOrDefaultAsync(d => d.Id == deliveryId);
-                
+
             if (delivery == null)
                 return false;            // Update current location
             delivery.CurrentLatitude = locationUpdate.Latitude;
@@ -502,7 +505,8 @@ namespace SmartDeliverySystem.Services
                 StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
                 LocationHistory = locationHistory
             };
-        }        public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
+        }
+        public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
         {
             var activeDeliveries = await _context.Deliveries
                 .Where(d => d.Status == DeliveryStatus.Assigned ||
@@ -517,7 +521,8 @@ namespace SmartDeliverySystem.Services
                 var tracking = await GetDeliveryTrackingAsync(delivery.Id);
                 if (tracking != null)
                     trackingList.Add(tracking);
-            }            return trackingList;
+            }
+            return trackingList;
         }
     }
 }
