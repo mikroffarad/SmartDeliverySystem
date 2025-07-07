@@ -13,11 +13,8 @@ namespace SmartDeliverySystem.Services
         Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status);
         Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment);
         Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto);
-
-        // GPS Tracking methods        Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
+        Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
         Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int deliveryId);
         Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync();
-        Task<bool> CheckDeliveryProductsAsync(int deliveryId);
-        Task<bool> UpdateLocationAsync(int id, LocationUpdateDto locationUpdate);
     }
 }
