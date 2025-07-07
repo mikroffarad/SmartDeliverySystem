@@ -54,9 +54,7 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 _logger.LogError(ex, "❌ Помилка при симуляції руху доставок");
             }
-        }
-
-        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
+        }        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
         {
             try
             {
@@ -76,24 +74,43 @@ namespace SmartDeliverySystem.Azure.Functions
                     speedKmh: 50 // швидкість 50 км/год
                 );
 
+                // Перевіряємо, чи прибули на місце призначення
+                var distanceToDestination = CalculateDistance(
+                    newPosition.Latitude, newPosition.Longitude,
+                    delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
+
+                string notes;
+                if (distanceToDestination < 0.05) // Менше 50 метрів від магазину
+                {
+                    notes = "🎯 Прибуття на місце призначення";
+                    // Встановлюємо точні координати магазину
+                    newPosition = (delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
+                }
+                else
+                {
+                    notes = "🚛 Автоматичне оновлення позиції";
+                }
+
                 // Відправляємо оновлення координат
                 var locationUpdate = new
                 {
                     latitude = newPosition.Latitude,
                     longitude = newPosition.Longitude,
-                    speed = 50.0,
-                    notes = "Автоматичне оновлення позиції"
+                    speed = distanceToDestination < 0.05 ? 0.0 : 50.0, // Швидкість 0 при прибутті
+                    notes = notes
                 };
 
                 var json = JsonSerializer.Serialize(locationUpdate);
-                var content = new StringContent(json, Encoding.UTF8, "application/json"); var updateResponse = await _httpClient.PostAsync(
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var updateResponse = await _httpClient.PostAsync(
                     $"https://localhost:7183/api/delivery/{delivery.DeliveryId}/update-location",
                     content);
 
                 if (updateResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("📍 Оновлено позицію доставки {DeliveryId}: {Lat}, {Lon}",
-                        delivery.DeliveryId, newPosition.Latitude, newPosition.Longitude);
+                    _logger.LogInformation("📍 Оновлено позицію доставки {DeliveryId}: {Lat}, {Lon} - {Notes}",
+                        delivery.DeliveryId, newPosition.Latitude, newPosition.Longitude, notes);
                 }
                 else
                 {
