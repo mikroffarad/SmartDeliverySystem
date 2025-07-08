@@ -150,7 +150,6 @@ namespace SmartDeliverySystem.Services
                 TotalAmount = totalAmount,
             };
         }
-
         public async Task<Store> FindBestStoreAsync(int vendorId, List<ProductRequestDto> products)
         {
             var vendor = await _context.Vendors.FindAsync(vendorId);
@@ -168,38 +167,79 @@ namespace SmartDeliverySystem.Services
                 .Where(sp => activeStores.Select(s => s.Id).Contains(sp.StoreId))
                 .ToListAsync();
 
-            // Знайти магазини, у яких є всі потрібні продукти у потрібній кількості
-            var suitableStores = activeStores.Where(store =>
-                products.All(req =>
-                    storeProducts.Any(sp =>
-                        sp.StoreId == store.Id &&
-                        sp.ProductId == req.ProductId &&
-                        sp.Quantity >= req.Quantity
-                    )
-                )
-            ).ToList();
+            // Детальна діагностика
+            _logger.LogInformation("Finding best store among {StoreCount} stores for {ProductCount} products",
+                activeStores.Count, products.Count);
 
-            if (!suitableStores.Any())
-                throw new InvalidOperationException("No store has all required products in sufficient quantity");
+            foreach (var product in products)
+            {
+                _logger.LogInformation("Product to deliver: {ProductId}, quantity: {Quantity}",
+                    product.ProductId, product.Quantity);
+            }
 
-            // Комбінований критерій: відстань - коеф * залишок потрібних товарів
-            double stockWeight = 0.01; // налаштуйте під себе
-            var bestStore = suitableStores
+            // Критерії вибору найкращого магазину:
+            // 1. Відстань від вендора до магазину (менша відстань = кращий бал)
+            // 2. Загальна кількість товарів у магазині (менша кількість = кращий бал, навіть 0)
+            // Формула: Score = (Distance * DistanceWeight) + (TotalInventory * InventoryWeight)
+            // Магазин з найменшим балом вибирається
+
+            double distanceWeight = 1.0;     // Вага для відстані (км)
+            double inventoryWeight = 0.001;  // Вага для інвентарю (менша кількість = кращий бал)
+
+            var bestStore = activeStores
                 .Select(store =>
                 {
+                    // Розрахунок відстані від вендора до магазину
                     var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude);
-                    var totalStock = products.Sum(req =>
-                        storeProducts.First(sp => sp.StoreId == store.Id && sp.ProductId == req.ProductId).Quantity
-                    );
-                    double score = distance - stockWeight * totalStock;
-                    return new { Store = store, Score = score };
+
+                    // Загальна кількість усіх товарів у магазині (може бути 0)
+                    var totalInventory = storeProducts
+                        .Where(sp => sp.StoreId == store.Id)
+                        .Sum(sp => sp.Quantity);
+
+                    // Комбінований бал: відстань + (кількість товарів * вага)
+                    // Менша кількість товарів = кращий бал (навіть якщо 0)
+                    double score = (distance * distanceWeight) + (totalInventory * inventoryWeight);
+
+                    _logger.LogInformation("Store {StoreId} ({StoreName}): Distance={Distance:F2}km, Inventory={Inventory}, Score={Score:F3}",
+                        store.Id, store.Name, distance, totalInventory, score);
+
+                    return new
+                    {
+                        Store = store,
+                        Score = score,
+                        Distance = distance,
+                        TotalInventory = totalInventory
+                    };
                 })
                 .OrderBy(x => x.Score)
-                .First().Store;
+                .First();
 
-            return bestStore;
+            _logger.LogInformation("✅ Selected store: {StoreName}, Distance: {Distance:F2}km, " +
+                                 "Total inventory: {Inventory} items, Score: {Score:F3}",
+                bestStore.Store.Name, bestStore.Distance, bestStore.TotalInventory, bestStore.Score);
+
+            return bestStore.Store;
         }
+        public async Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products)
+        {
+            _logger.LogInformation("Finding best store for vendor {VendorId}", vendorId);
 
+            // Use existing logic from FindBestStoreAsync
+            var bestStore = await FindBestStoreAsync(vendorId, products);
+            var vendor = await _context.Vendors.FindAsync(vendorId);
+            if (vendor == null)
+                throw new InvalidOperationException("Vendor not found.");
+
+            var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, bestStore.Latitude, bestStore.Longitude);
+
+            return new FindBestStoreResponseDto
+            {
+                StoreId = bestStore.Id,
+                StoreName = bestStore.Name,
+                Distance = distance
+            };
+        }
         public async Task<Delivery?> GetDeliveryAsync(int deliveryId)
         {
             return await _context.Deliveries

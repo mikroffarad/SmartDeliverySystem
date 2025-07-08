@@ -32,12 +32,16 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             max-width: 300px;
-        }        .delivery-status {
+        }
+
+        .delivery-status {
             padding: 5px 10px;
             border-radius: 4px;
             font-weight: bold;
             margin: 5px 0;
-        }        .status-pending {
+        }
+
+        .status-pending {
             background-color: #6c757d;
             color: white;
         }
@@ -60,10 +64,14 @@
         .status-delivered {
             background-color: #17a2b8;
             color: white;
-        }.status-paid {
+        }
+
+        .status-paid {
             background-color: #ffc107;
             color: #212529;
-        }        .status-cancelled {
+        }
+
+        .status-cancelled {
             background-color: #dc3545;
             color: white;
         }
@@ -420,12 +428,16 @@
     <div id="deliveryModal" class="products-modal">
         <div class="products-modal-content">
             <h3 id="deliveryModalTitle">Create Delivery Request</h3>
-
             <div class="delivery-form"> <label for="storeSelect">Select Destination Store:</label>
-                <select id="storeSelect" required>
-                    <option value="">Choose a store...</option>
-                    <option value="auto">🎯 Auto-select best store</option>
-                </select>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <select id="storeSelect" required style="flex: 1;">
+                        <option value="">Choose a store...</option>
+                    </select>
+                    <button type="button" id="autoSelectBtn"
+                        style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">
+                        🎯 Auto-select best store
+                    </button>
+                </div>
 
                 <label>Select Products and Quantities:</label>
                 <div id="productSelection" class="product-selection">
@@ -546,19 +558,19 @@
         });        // Listen for delivery status updates
         connection.on("DeliveryStatusUpdated", function (data) {
             const deliveryId = data.deliveryId;
-            
+
             if (data.status === 'Delivered' || data.status === 'Cancelled') {
                 // Remove truck marker immediately when delivered or cancelled
                 if (deliveryMarkers[deliveryId]) {
                     map.removeLayer(deliveryMarkers[deliveryId]);
                     delete deliveryMarkers[deliveryId];
                 }
-                
+
                 // Remove from local data
                 if (deliveryData[deliveryId]) {
                     delete deliveryData[deliveryId];
                 }
-                
+
                 // Update the deliveries list immediately
                 updateDeliveriesList();
             } else if (deliveryData[deliveryId]) {
@@ -1358,16 +1370,14 @@
             } catch (error) {
                 console.error('Error loading vendor products for delivery:', error);
             }
-        }
-
-        async function loadStoresForDelivery() {
+        } async function loadStoresForDelivery() {
             try {
                 const response = await fetch('https://localhost:7183/api/stores');
                 const stores = await response.json();
 
                 const storeSelect = document.getElementById('storeSelect');
-                // Clear existing options except the first two
-                while (storeSelect.children.length > 2) {
+                // Clear existing options except the first one
+                while (storeSelect.children.length > 1) {
                     storeSelect.removeChild(storeSelect.lastChild);
                 }
 
@@ -1380,9 +1390,7 @@
             } catch (error) {
                 console.error('Error loading stores for delivery:', error);
             }
-        }
-
-        function updateTotalAmount() {
+        } function updateTotalAmount() {
             let total = 0;
             const quantityInputs = document.querySelectorAll('.quantity-input');
 
@@ -1395,7 +1403,69 @@
             document.getElementById('totalAmount').textContent = total.toFixed(2);
         }
 
-        async function createDelivery() {
+        // Auto-select best store function
+        async function autoSelectBestStore() {
+            const storeSelect = document.getElementById('storeSelect');
+            const autoSelectBtn = document.getElementById('autoSelectBtn');
+
+            // Collect selected products first
+            const products = [];
+            const quantityInputs = document.querySelectorAll('.quantity-input');
+
+            quantityInputs.forEach(input => {
+                const quantity = parseInt(input.value) || 0;
+                if (quantity > 0) {
+                    products.push({
+                        productId: parseInt(input.dataset.productId),
+                        quantity: quantity
+                    });
+                }
+            });
+
+            if (products.length === 0) {
+                alert('Please select at least one product with quantity > 0 before auto-selecting store');
+                return;
+            }
+
+            // Disable button and show loading
+            autoSelectBtn.disabled = true;
+            autoSelectBtn.textContent = '🔄 Finding best store...';
+
+            try {
+                // Call API to find best store
+                const response = await fetch('https://localhost:7183/api/delivery/find-best-store', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        vendorId: currentVendorId,
+                        products: products
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Select the best store in dropdown
+                    storeSelect.value = result.storeId;
+
+                    // Show success message
+                    alert(`🎯 Best store selected: ${result.storeName}\n\nDistance: ${result.distance?.toFixed(2)} km\nReason: Optimal combination of distance and inventory balance`);
+
+                } else {
+                    const error = await response.text();
+                    alert(`Error finding best store: ${error}`);
+                }
+            } catch (error) {
+                console.error('Error auto-selecting store:', error);
+                alert('Error finding best store. Please try again.');
+            } finally {
+                // Re-enable button
+                autoSelectBtn.disabled = false;
+                autoSelectBtn.textContent = '🎯 Auto-select best store';
+            }
+        } async function createDelivery() {
             const storeSelect = document.getElementById('storeSelect');
             const selectedStoreId = storeSelect.value;
 
@@ -1419,41 +1489,27 @@
             }
 
             if (!selectedStoreId) {
-                alert('Please select a destination store');
+                alert('Please select a destination store or use Auto-select');
                 return;
-            }            // Prepare delivery request
-            let deliveryRequest;
+            }
 
-            if (selectedStoreId === 'auto') {
-                // Use auto-select API format
-                deliveryRequest = {
-                    vendorId: currentVendorId,
-                    products: products
-                };
-            } else {
-                // Use manual store selection API format
-                deliveryRequest = {
-                    vendorId: currentVendorId,
-                    storeId: parseInt(selectedStoreId),
-                    products: products
-                };
-            } try {
-                let apiUrl = 'https://localhost:7183/api/delivery/request';
-                if (selectedStoreId === 'auto') {
-                    // Use existing API that auto-selects store
-                    apiUrl = 'https://localhost:7183/api/delivery/request';
-                } else {
-                    // We'll need a new API endpoint for manual store selection
-                    apiUrl = 'https://localhost:7183/api/delivery/request-manual';
-                }
+            // Prepare delivery request for manual store selection
+            const deliveryRequest = {
+                vendorId: currentVendorId,
+                storeId: parseInt(selectedStoreId),
+                products: products
+            };
 
-                const response = await fetch(apiUrl, {
+            try {
+                const response = await fetch('https://localhost:7183/api/delivery/request-manual', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(deliveryRequest)
-                }); if (response.ok) {
+                });
+
+                if (response.ok) {
                     const result = await response.json();
 
                     // Close delivery creation modal
@@ -1477,6 +1533,7 @@
         }        // Event Listeners for delivery modal
         document.getElementById('createDeliveryBtn').addEventListener('click', createDelivery);
         document.getElementById('cancelDeliveryBtn').addEventListener('click', cancelDeliveryRequest);
+        document.getElementById('autoSelectBtn').addEventListener('click', autoSelectBestStore);
 
         // Event Listeners for modals
         document.getElementById('addProductBtn').addEventListener('click', function () {

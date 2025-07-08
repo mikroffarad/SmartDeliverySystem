@@ -2,6 +2,7 @@
 using SmartDeliverySystem.DTOs;
 using SmartDeliverySystem.Models;
 using SmartDeliverySystem.Services;
+using DeliveryDto = SmartDeliverySystem.DTOs.DeliveryResponseDto;
 
 namespace SmartDeliverySystem.Controllers
 {
@@ -33,15 +34,18 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogInformation("🔄 Attempting to send message to Service Bus...");
                 _logger.LogInformation("ServiceBusService is null: {IsNull}", _serviceBusService == null);
 
-                await _serviceBusService.SendDeliveryRequestAsync(new
+                if (_serviceBusService != null)
                 {
-                    DeliveryId = response.DeliveryId,
-                    VendorId = request.VendorId,
-                    StoreId = response.StoreId,
-                    TotalAmount = response.TotalAmount,
-                    CreatedAt = DateTime.UtcNow
-                });
-                _logger.LogInformation("✅ Delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                    await _serviceBusService.SendDeliveryRequestAsync(new
+                    {
+                        DeliveryId = response.DeliveryId,
+                        VendorId = request.VendorId,
+                        StoreId = response.StoreId,
+                        TotalAmount = response.TotalAmount,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    _logger.LogInformation("✅ Delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                }
             }
             catch (Exception ex)
             {
@@ -214,6 +218,21 @@ namespace SmartDeliverySystem.Controllers
         {
             var trackingList = await _deliveryService.GetAllActiveTrackingAsync();
             return Ok(trackingList);
+        }
+
+        [HttpPost("find-best-store")]
+        public async Task<IActionResult> FindBestStore([FromBody] FindBestStoreRequestDto request)
+        {
+            try
+            {
+                var result = await _deliveryService.FindBestStoreForDeliveryAsync(request.VendorId, request.Products);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finding best store for vendor {VendorId}", request.VendorId);
+                return BadRequest(ex.Message);
+            }
         }
     }
 }

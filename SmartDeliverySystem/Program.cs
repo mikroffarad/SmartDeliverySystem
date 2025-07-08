@@ -21,6 +21,7 @@ builder.Services.AddDbContext<DeliveryContext>(options =>
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 builder.Services.AddScoped<IServiceBusService, ServiceBusService>();
 builder.Services.AddScoped<ISignalRService, SignalRService>();
+builder.Services.AddScoped<ITableStorageService, TableStorageService>();
 
 // SignalR
 builder.Services.AddSignalR();
@@ -30,6 +31,13 @@ builder.Services.AddSingleton(provider =>
 {
     var connectionString = builder.Configuration.GetConnectionString("ServiceBus");
     return new Azure.Messaging.ServiceBus.ServiceBusClient(connectionString);
+});
+
+// Azure Table Storage
+builder.Services.AddSingleton(provider =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("AzureStorage");
+    return new Azure.Data.Tables.TableServiceClient(connectionString);
 });
 
 // CORS for frontend

@@ -13,9 +13,8 @@ namespace SmartDeliverySystem.Azure.Functions
         {
             _logger = logger;
         }
-
         [Function("LocationUpdate")]
-        public void Run([ServiceBusTrigger("location-updates", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
+        public async Task Run([ServiceBusTrigger("location-updates", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
         {
             _logger.LogInformation("📍 GPS оновлення отримано!");
             _logger.LogInformation("Message ID: {MessageId}", message.MessageId);
@@ -31,10 +30,14 @@ namespace SmartDeliverySystem.Azure.Functions
                     _logger.LogInformation("🚛 Delivery {DeliveryId} at coordinates: {Lat}, {Lon}",
                         locationData.DeliveryId, locationData.Latitude, locationData.Longitude);
 
-                    // TODO:
-                    // 1. Зберегти в Table Storage
-                    // 2. Оновити поточну позицію в SQL
-                    // 3. Надіслати через SignalR для real-time оновлень
+                    // 1. Save to Table Storage for history
+                    await SaveLocationToTableStorage(locationData);
+
+                    // 2. Update current position in SQL via API
+                    await UpdateCurrentLocationInDatabase(locationData);
+
+                    // 3. Send through SignalR for real-time updates
+                    await SendLocationUpdateViaSignalR(locationData);
                 }
 
                 _logger.LogInformation("✅ GPS дані успішно оброблені!");
@@ -44,6 +47,33 @@ namespace SmartDeliverySystem.Azure.Functions
                 _logger.LogError(ex, "❌ Помилка обробки GPS даних");
                 throw;
             }
+        }
+        private Task SaveLocationToTableStorage(LocationUpdateMessage locationData)
+        {
+            // TODO: Implement Table Storage saving
+            _logger.LogInformation("💾 Saving GPS data to Table Storage for delivery {DeliveryId}", locationData.DeliveryId);
+
+            // This would connect to Azure Table Storage and save GPS history
+            // Implementation depends on your table storage setup
+            return Task.CompletedTask;
+        }
+
+        private Task UpdateCurrentLocationInDatabase(LocationUpdateMessage locationData)
+        {
+            // TODO: Implement API call to update current location in SQL database
+            _logger.LogInformation("🔄 Updating current location in database for delivery {DeliveryId}", locationData.DeliveryId);
+
+            // This would make HTTP call to your main API to update current delivery position
+            return Task.CompletedTask;
+        }
+
+        private Task SendLocationUpdateViaSignalR(LocationUpdateMessage locationData)
+        {
+            // TODO: Implement SignalR notification
+            _logger.LogInformation("📡 Sending real-time update via SignalR for delivery {DeliveryId}", locationData.DeliveryId);
+
+            // This would send real-time update to connected clients
+            return Task.CompletedTask;
         }
     }
 

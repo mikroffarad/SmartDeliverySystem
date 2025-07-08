@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Net.Http;
 using System.Text;
+using SmartDeliverySystem.Azure.Functions.DTOs;
 
 namespace SmartDeliverySystem.Azure.Functions
 {
@@ -54,7 +55,8 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 _logger.LogError(ex, "❌ Помилка при симуляції руху доставок");
             }
-        }        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
+        }
+        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
         {
             try
             {
@@ -160,19 +162,7 @@ namespace SmartDeliverySystem.Azure.Functions
                     Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
                     Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
 
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return 6371 * c; // відстань в км
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a)); return 6371 * c; // відстань в км
         }
-    }
-    public class DeliveryTrackingData
-    {
-        public int DeliveryId { get; set; }
-        public int Status { get; set; } // Status приходить як число (enum)
-        public double? CurrentLatitude { get; set; }
-        public double? CurrentLongitude { get; set; }
-        public double? VendorLatitude { get; set; }
-        public double? VendorLongitude { get; set; }
-        public double? StoreLatitude { get; set; }
-        public double? StoreLongitude { get; set; }
     }
 }
