@@ -1,5 +1,4 @@
 ﻿using SmartDeliverySystem.DTOs;
-using SmartDeliverySystem.DTOs;
 using SmartDeliverySystem.Models;
 
 namespace SmartDeliverySystem.Services

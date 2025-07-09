@@ -20,4 +20,13 @@ namespace SmartDeliverySystem.DTOs
         public int VendorId { get; set; }
         public List<ProductRequestDto> Products { get; set; } = new List<ProductRequestDto>();
     }
+
+    public class LocationHistoryDto
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double? Speed { get; set; }
+        public string? Notes { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
 }

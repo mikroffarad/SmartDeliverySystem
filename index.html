@@ -987,9 +987,7 @@
                 const div = document.createElement('div');
 
                 // Ensure status is a string and handle potential null/undefined values
-                const status = delivery.status ? String(delivery.status).toLowerCase() : 'pending';
-
-                // Add delivery status management buttons for manual completion if needed
+                const status = delivery.status ? String(delivery.status).toLowerCase() : 'pending';                // Add delivery status management buttons for manual completion if needed
                 let statusButtons = '';
                 if (delivery.status === 'InTransit') {
                     statusButtons = `
@@ -999,6 +997,14 @@
                         </button>
                     `;
                 }
+
+                // Add GPS History button for all deliveries
+                statusButtons += `
+                    <button onclick="showLocationHistory(${deliveryId})"
+                            style="background: #17a2b8; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px;">
+                        📍 GPS History
+                    </button>
+                `;
 
                 div.innerHTML = `
                     <div class="delivery-status status-${status}">
@@ -1696,6 +1702,47 @@
             }
         }
 
+        // GPS History Functions
+        async function showLocationHistory(deliveryId) {
+            try {
+                const response = await fetch(`https://localhost:7183/api/delivery/${deliveryId}/location-history`);
+                
+                if (response.ok) {
+                    const history = await response.json();
+                    
+                    console.log('GPS History:', history);
+                    
+                    if (history.length > 0) {
+                        let historyText = `📍 GPS History for Delivery ${deliveryId}:\n\n`;
+                        historyText += `Total GPS points recorded: ${history.length}\n\n`;
+                        
+                        // Show last 5 GPS points for preview
+                        const recentPoints = history.slice(-5);
+                        historyText += "Recent GPS points:\n";
+                        recentPoints.forEach((point, index) => {
+                            const time = new Date(point.timestamp).toLocaleString();
+                            historyText += `${index + 1}. ${time}\n`;
+                            historyText += `   Location: ${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}\n`;
+                            if (point.speed) historyText += `   Speed: ${point.speed.toFixed(1)} km/h\n`;
+                            if (point.notes) historyText += `   Notes: ${point.notes}\n`;
+                            historyText += "\n";
+                        });
+                        
+                        historyText += "\n💡 Check browser console for full GPS data";
+                        alert(historyText);
+                    } else {
+                        alert(`📍 No GPS history found for Delivery ${deliveryId}\n\nThis could mean:\n- Delivery hasn't started tracking yet\n- GPS data is being processed\n- Table Storage connection issue`);
+                    }
+                } else {
+                    const error = await response.text();
+                    alert(`Error fetching GPS history: ${error}`);
+                }
+            } catch (error) {
+                console.error('Error fetching GPS history:', error);
+                alert('Error fetching GPS history. Please check console for details.');
+            }
+        }
+
         // Event Listeners for payment and driver modals
         document.getElementById('processPaymentBtn').addEventListener('click', processPayment);
         document.getElementById('cancelPaymentBtn').addEventListener('click', cancelPayment);
@@ -1705,4 +1752,3 @@
 </body>
 
 </html>
-```

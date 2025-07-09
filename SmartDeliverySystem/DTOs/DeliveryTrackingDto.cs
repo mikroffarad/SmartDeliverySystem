@@ -4,15 +4,6 @@ using System.Collections.Generic;
 
 namespace SmartDeliverySystem.DTOs
 {
-    public class LocationHistoryDto
-    {
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public DateTime Timestamp { get; set; }
-        public string? Notes { get; set; }
-        public double? Speed { get; set; }
-    }
-
     public class DeliveryTrackingDto
     {
         public int DeliveryId { get; set; }

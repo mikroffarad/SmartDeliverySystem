@@ -1,18 +1,21 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Azure.Messaging.ServiceBus;
+using Azure.Data.Tables;
 using System.Text.Json;
 
 namespace SmartDeliverySystem.Azure.Functions
-{
-    public class LocationUpdateFunction
+{    public class LocationUpdateFunction
     {
         private readonly ILogger<LocationUpdateFunction> _logger;
+        private readonly TableServiceClient _tableServiceClient;
 
-        public LocationUpdateFunction(ILogger<LocationUpdateFunction> logger)
+        public LocationUpdateFunction(ILogger<LocationUpdateFunction> logger, TableServiceClient tableServiceClient)
         {
             _logger = logger;
+            _tableServiceClient = tableServiceClient;
         }
+
         [Function("LocationUpdate")]
         public async Task Run([ServiceBusTrigger("location-updates", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
         {
@@ -23,21 +26,13 @@ namespace SmartDeliverySystem.Azure.Functions
             try
             {
                 // Десеріалізація GPS даних
-                var locationData = JsonSerializer.Deserialize<LocationUpdateMessage>(message.Body.ToString());
-
-                if (locationData != null)
+                var locationData = JsonSerializer.Deserialize<LocationUpdateMessage>(message.Body.ToString()); if (locationData != null)
                 {
                     _logger.LogInformation("🚛 Delivery {DeliveryId} at coordinates: {Lat}, {Lon}",
                         locationData.DeliveryId, locationData.Latitude, locationData.Longitude);
 
-                    // 1. Save to Table Storage for history
+                    // Save to Table Storage for history
                     await SaveLocationToTableStorage(locationData);
-
-                    // 2. Update current position in SQL via API
-                    await UpdateCurrentLocationInDatabase(locationData);
-
-                    // 3. Send through SignalR for real-time updates
-                    await SendLocationUpdateViaSignalR(locationData);
                 }
 
                 _logger.LogInformation("✅ GPS дані успішно оброблені!");
@@ -48,32 +43,31 @@ namespace SmartDeliverySystem.Azure.Functions
                 throw;
             }
         }
-        private Task SaveLocationToTableStorage(LocationUpdateMessage locationData)
+
+        private async Task SaveLocationToTableStorage(LocationUpdateMessage locationData)
         {
-            // TODO: Implement Table Storage saving
-            _logger.LogInformation("💾 Saving GPS data to Table Storage for delivery {DeliveryId}", locationData.DeliveryId);
+            try
+            {
+                var tableClient = _tableServiceClient.GetTableClient("LocationHistory");
+                await tableClient.CreateIfNotExistsAsync();
 
-            // This would connect to Azure Table Storage and save GPS history
-            // Implementation depends on your table storage setup
-            return Task.CompletedTask;
-        }
+                var entity = new TableEntity($"Delivery_{locationData.DeliveryId}", DateTime.UtcNow.Ticks.ToString())
+                {
+                    ["DeliveryId"] = locationData.DeliveryId,
+                    ["Latitude"] = locationData.Latitude,
+                    ["Longitude"] = locationData.Longitude,
+                    ["Speed"] = locationData.Speed,
+                    ["Notes"] = locationData.Notes ?? "",
+                    ["Timestamp"] = locationData.Timestamp
+                };
 
-        private Task UpdateCurrentLocationInDatabase(LocationUpdateMessage locationData)
-        {
-            // TODO: Implement API call to update current location in SQL database
-            _logger.LogInformation("🔄 Updating current location in database for delivery {DeliveryId}", locationData.DeliveryId);
-
-            // This would make HTTP call to your main API to update current delivery position
-            return Task.CompletedTask;
-        }
-
-        private Task SendLocationUpdateViaSignalR(LocationUpdateMessage locationData)
-        {
-            // TODO: Implement SignalR notification
-            _logger.LogInformation("📡 Sending real-time update via SignalR for delivery {DeliveryId}", locationData.DeliveryId);
-
-            // This would send real-time update to connected clients
-            return Task.CompletedTask;
+                await tableClient.AddEntityAsync(entity);
+                _logger.LogInformation("💾 GPS data saved to Table Storage for delivery {DeliveryId}", locationData.DeliveryId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Failed to save GPS data to Table Storage for delivery {DeliveryId}", locationData.DeliveryId);
+            }
         }
     }
 

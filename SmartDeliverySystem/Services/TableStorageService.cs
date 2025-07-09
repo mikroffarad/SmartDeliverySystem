@@ -1,55 +1,62 @@
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using SmartDeliverySystem.DTOs;
 
 namespace SmartDeliverySystem.Services
 {
     public interface ITableStorageService
     {
-        Task SaveLocationHistoryAsync(int deliveryId, LocationUpdateDto locationUpdate);
         Task<List<LocationHistoryDto>> GetLocationHistoryAsync(int deliveryId);
     }
 
     public class TableStorageService : ITableStorageService
     {
-        private readonly TableClient _tableClient;
+        private readonly TableServiceClient _tableServiceClient;
         private readonly ILogger<TableStorageService> _logger;
 
-        public TableStorageService(TableServiceClient tableServiceClient, ILogger<TableStorageService> logger)
+        public TableStorageService(IConfiguration configuration, ILogger<TableStorageService> logger)
         {
-            _tableClient = tableServiceClient.GetTableClient("LocationHistory");
-            _tableClient.CreateIfNotExistsAsync();
+            var connectionString = configuration.GetConnectionString("AzureStorage");
+            _tableServiceClient = new TableServiceClient(connectionString);
             _logger = logger;
-        }
-
-        public async Task SaveLocationHistoryAsync(int deliveryId, LocationUpdateDto locationUpdate)
-        {
-            var entity = new TableEntity($"Delivery_{deliveryId}", DateTime.UtcNow.Ticks.ToString())
-            {
-                ["DeliveryId"] = deliveryId,
-                ["Latitude"] = locationUpdate.Latitude,
-                ["Longitude"] = locationUpdate.Longitude,
-                ["Speed"] = locationUpdate.Speed,
-                ["Notes"] = locationUpdate.Notes,
-                ["Timestamp"] = DateTime.UtcNow
-            };
-
-            await _tableClient.AddEntityAsync(entity);
-            _logger.LogInformation("Location saved to Table Storage for delivery {DeliveryId}", deliveryId);
         }
 
         public async Task<List<LocationHistoryDto>> GetLocationHistoryAsync(int deliveryId)
         {
-            var entities = _tableClient.Query<TableEntity>(e => e.PartitionKey == $"Delivery_{deliveryId}");
-
-            return entities.Select(e => new LocationHistoryDto
+            try
             {
-                Latitude = e.GetDouble("Latitude") ?? 0,
-                Longitude = e.GetDouble("Longitude") ?? 0,
-                Speed = e.GetDouble("Speed"),
-                Notes = e.GetString("Notes"),
-                Timestamp = e.GetDateTime("Timestamp") ?? DateTime.UtcNow
-            }).OrderBy(h => h.Timestamp).ToList();
+                var tableClient = _tableServiceClient.GetTableClient("LocationHistory");
+                await tableClient.CreateIfNotExistsAsync();
+
+                var filter = $"PartitionKey eq 'Delivery_{deliveryId}'";
+                var entities = tableClient.QueryAsync<TableEntity>(filter);
+
+                var history = new List<LocationHistoryDto>();
+
+                await foreach (var entity in entities)
+                {
+                    history.Add(new LocationHistoryDto
+                    {
+                        Latitude = entity.GetDouble("Latitude") ?? 0,
+                        Longitude = entity.GetDouble("Longitude") ?? 0,
+                        Speed = entity.GetDouble("Speed"),
+                        Notes = entity.GetString("Notes"),
+                        Timestamp = entity.GetDateTimeOffset("Timestamp")?.DateTime ?? DateTime.UtcNow
+                    });
+                }
+
+                // Sort by timestamp descending (newest first)
+                history = history.OrderByDescending(h => h.Timestamp).ToList();
+
+                _logger.LogInformation("Retrieved {Count} GPS records for delivery {DeliveryId}", history.Count, deliveryId);
+                return history;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving GPS history for delivery {DeliveryId}", deliveryId);
+                return new List<LocationHistoryDto>();
+            }
         }
     }
 }
