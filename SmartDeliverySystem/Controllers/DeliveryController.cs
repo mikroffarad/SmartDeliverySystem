@@ -7,7 +7,8 @@ using DeliveryDto = SmartDeliverySystem.DTOs.DeliveryResponseDto;
 namespace SmartDeliverySystem.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]    public class DeliveryController : ControllerBase
+    [Route("api/[controller]")]
+    public class DeliveryController : ControllerBase
     {
         private readonly IDeliveryService _deliveryService;
         private readonly IServiceBusService _serviceBusService;
@@ -16,8 +17,8 @@ namespace SmartDeliverySystem.Controllers
         private readonly ILogger<DeliveryController> _logger;
 
         public DeliveryController(
-            IDeliveryService deliveryService, 
-            IServiceBusService serviceBusService, 
+            IDeliveryService deliveryService,
+            IServiceBusService serviceBusService,
             ISignalRService signalRService,
             ITableStorageService tableStorageService,
             ILogger<DeliveryController> logger)
@@ -239,15 +240,16 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogError(ex, "Error finding best store for vendor {VendorId}", request.VendorId);
                 return BadRequest(ex.Message);
             }
-        }        [HttpGet("{deliveryId}/location-history")]
+        }
+        [HttpGet("{deliveryId}/location-history")]
         public async Task<ActionResult<List<LocationHistoryDto>>> GetLocationHistory(int deliveryId)
         {
             try
             {
                 _logger.LogInformation("Requesting GPS history for delivery {DeliveryId}", deliveryId);
-                
+
                 var history = await _tableStorageService.GetLocationHistoryAsync(deliveryId);
-                
+
                 _logger.LogInformation("Found {Count} GPS records for delivery {DeliveryId}", history.Count, deliveryId);
                 return Ok(history);
             }

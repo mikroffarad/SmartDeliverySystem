@@ -1,4 +1,4 @@
-# Smart Delivery System
+# Smart Delivery System - React Migration
 
 Automated system, which tracks delivery and process them.
 
@@ -144,3 +144,60 @@ Web API → Service Bus → Azure Functions → SQL Database
 - Use template files (`*.template.json`)
 - Add real config files to `.gitignore`
 - Use Azure Key Vault for production
+
+## Структура проєкту
+Я переписав ваш HTML-файл на React з TypeScript, створивши модульну структуру:
+
+```
+src/
+├── components/           # React компоненти
+│   ├── MapContainer.tsx     # Карта Leaflet
+│   ├── DeliveryInfo.tsx     # Інформація про доставки
+│   ├── ControlButtons.tsx   # Кнопки керування
+│   ├── AddLocationModal.tsx # Модальне вікно додавання локацій
+│   ├── ProductsModal.tsx    # Модальне вікно продуктів
+│   ├── StoreProductsModal.tsx # Модальне вікно інвентаря
+│   ├── DeliveryModal.tsx    # Модальне вікно доставки
+│   ├── PaymentModal.tsx     # Модальне вікно платежів
+│   └── DriverModal.tsx      # Модальне вікно водіїв
+├── services/
+│   └── deliveryApi.ts       # API сервіс для REST запитів
+├── types/
+│   └── delivery.ts          # TypeScript типи
+├── App.tsx                  # Головний компонент
+├── App.css                  # Стилі додатку
+├── main.tsx                 # Точка входу
+└── index.css                # Глобальні стилі
+```
+
+## Встановлення залежностей
+```bash
+npm install
+```
+
+## Запуск проєкту
+```bash
+npm run dev
+```
+
+## Що зроблено:
+1. ✅ Створено модульну структуру React
+2. ✅ Виділено типи TypeScript
+3. ✅ Створено API сервіс для REST запитів
+4. ✅ Створено компоненти для всіх функцій
+5. ✅ Налаштовано Vite для швидкої розробки
+6. ✅ Додано стилі CSS
+
+## Що потрібно доробити:
+1. Встановити пакети: `npm install`
+2. Реалізувати JSX для компонентів (зараз це заглушки)
+3. Додати SignalR підключення
+4. Інтегрувати Leaflet карту
+5. Додати обробку форм і модальних вікон
+
+## Переваги нової структури:
+- Модульність і переважання коду
+- Типобезпека TypeScript
+- Швидка розробка з Vite
+- Легка підтримка і розширення
+- Розділення логіки і представлення

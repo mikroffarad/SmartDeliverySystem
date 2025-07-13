@@ -55,18 +55,24 @@ namespace SmartDeliverySystem.Controllers
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
-
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, ProductDto dto)
         {
             var product = await _context.Products.FindAsync(id);
             if (product == null) return NotFound();
 
-            var vendor = await _context.Vendors.FindAsync(dto.VendorId);
-            if (vendor == null)
-                return BadRequest($"Vendor with id {dto.VendorId} does not exist.");
-
-            _mapper.Map(dto, product);
+            // Перевіряємо, чи існує vendor тільки якщо vendorId змінився
+            if (product.VendorId != dto.VendorId)
+            {
+                var vendor = await _context.Vendors.FindAsync(dto.VendorId);
+                if (vendor == null)
+                    return BadRequest($"Vendor with id {dto.VendorId} does not exist.");
+            }            // Оновлюємо дані продукту
+            product.Name = dto.Name;
+            product.Weight = (decimal)dto.Weight;
+            product.Category = dto.Category;
+            product.Price = (decimal)dto.Price;
+            product.VendorId = dto.VendorId;
 
             await _context.SaveChangesAsync();
             return NoContent();

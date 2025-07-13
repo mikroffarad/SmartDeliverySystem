@@ -7,7 +7,9 @@ using Azure.Messaging.ServiceBus;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddAutoMapper(typeof(SmartDeliverySystem.Mapping.MappingProfile));
+// Add AutoMapper
+builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddAutoMapper(typeof(SmartDeliverySystem.Mappings.MappingProfile));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

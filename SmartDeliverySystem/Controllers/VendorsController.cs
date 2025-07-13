@@ -88,7 +88,6 @@ namespace SmartDeliverySystem.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
-
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteVendor(int id)
         {
@@ -97,6 +96,35 @@ namespace SmartDeliverySystem.Controllers
             _context.Vendors.Remove(vendor);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // Products for specific vendor
+        [HttpGet("{id}/products")]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetVendorProducts(int id)
+        {
+            var vendor = await _context.Vendors
+                .Include(v => v.Products)
+                .FirstOrDefaultAsync(v => v.Id == id);
+
+            if (vendor == null) return NotFound();
+
+            var products = _mapper.Map<List<ProductDto>>(vendor.Products);
+            return Ok(products);
+        }
+
+        [HttpPost("{id}/products")]
+        public async Task<ActionResult<ProductDto>> AddProductToVendor(int id, [FromBody] ProductDto dto)
+        {
+            var vendor = await _context.Vendors.FindAsync(id);
+            if (vendor == null) return NotFound($"Vendor with id {id} not found");
+
+            // Set the vendor ID from the route parameter
+            dto.VendorId = id;
+
+            var product = _mapper.Map<Product>(dto);
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync(); var resultDto = _mapper.Map<ProductDto>(product);
+            return CreatedAtAction(nameof(ProductsController.GetProduct), "Products", new { id = product.Id }, resultDto);
         }
     }
 }

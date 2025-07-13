@@ -5,7 +5,8 @@ using Azure.Data.Tables;
 using System.Text.Json;
 
 namespace SmartDeliverySystem.Azure.Functions
-{    public class LocationUpdateFunction
+{
+    public class LocationUpdateFunction
     {
         private readonly ILogger<LocationUpdateFunction> _logger;
         private readonly TableServiceClient _tableServiceClient;
