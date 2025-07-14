@@ -175,7 +175,7 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("{id}/update-location")]
         public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
         {
-            _logger.LogInformation("🌍 UpdateLocation endpoint викликано для доставки {DeliveryId} з координатами {Lat}, {Lon}", 
+            _logger.LogInformation("🌍 UpdateLocation endpoint викликано для доставки {DeliveryId} з координатами {Lat}, {Lon}",
                 id, locationUpdate.Latitude, locationUpdate.Longitude);
 
             if (!ModelState.IsValid)
@@ -290,7 +290,7 @@ namespace SmartDeliverySystem.Controllers
             // Симулюємо рух на 0.001 градусів на північ
             var currentLat = delivery.CurrentLatitude ?? delivery.FromLatitude ?? 0;
             var currentLon = delivery.CurrentLongitude ?? delivery.FromLongitude ?? 0;
-            
+
             var newLat = currentLat + 0.001;
             var newLon = currentLon + 0.001;
 
@@ -318,12 +318,14 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogError(ex, "Помилка при відправці SignalR оновлення");
             }
 
-            return Ok(new { 
+            return Ok(new
+            {
                 message = "Test movement completed",
                 oldPosition = new { lat = currentLat, lon = currentLon },
                 newPosition = new { lat = newLat, lon = newLon }
             });
-        }        [HttpGet("{deliveryId}/route-index")]
+        }
+        [HttpGet("{deliveryId}/route-index")]
         public ActionResult<string> GetRouteIndex(int deliveryId)
         {
             try

@@ -524,27 +524,27 @@ namespace SmartDeliverySystem.Services
                     Notes = h.Notes,
                     Speed = h.Speed
                 })
-                .ToListAsync();            return new DeliveryTrackingDto
-            {
-                DeliveryId = delivery.Id,
-                VendorId = delivery.VendorId, // Додаємо ID вендора
-                StoreId = delivery.StoreId, // Додаємо ID магазину
-                DriverId = delivery.DriverId ?? string.Empty,
-                GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
-                Status = delivery.Status,
-                CurrentLatitude = delivery.CurrentLatitude,
-                CurrentLongitude = delivery.CurrentLongitude,
-                LastLocationUpdate = delivery.LastLocationUpdate,
-                FromLatitude = delivery.FromLatitude,
-                FromLongitude = delivery.FromLongitude,
-                ToLatitude = delivery.ToLatitude,
-                ToLongitude = delivery.ToLongitude,
-                VendorLatitude = delivery.FromLatitude, // Додаємо координати вендора
-                VendorLongitude = delivery.FromLongitude, // Додаємо координати вендора
-                StoreLatitude = delivery.ToLatitude, // Додаємо координати магазину
-                StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
-                LocationHistory = locationHistory
-            };
+                .ToListAsync(); return new DeliveryTrackingDto
+                {
+                    DeliveryId = delivery.Id,
+                    VendorId = delivery.VendorId, // Додаємо ID вендора
+                    StoreId = delivery.StoreId, // Додаємо ID магазину
+                    DriverId = delivery.DriverId ?? string.Empty,
+                    GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
+                    Status = delivery.Status,
+                    CurrentLatitude = delivery.CurrentLatitude,
+                    CurrentLongitude = delivery.CurrentLongitude,
+                    LastLocationUpdate = delivery.LastLocationUpdate,
+                    FromLatitude = delivery.FromLatitude,
+                    FromLongitude = delivery.FromLongitude,
+                    ToLatitude = delivery.ToLatitude,
+                    ToLongitude = delivery.ToLongitude,
+                    VendorLatitude = delivery.FromLatitude, // Додаємо координати вендора
+                    VendorLongitude = delivery.FromLongitude, // Додаємо координати вендора
+                    StoreLatitude = delivery.ToLatitude, // Додаємо координати магазину
+                    StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
+                    LocationHistory = locationHistory
+                };
         }
         public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
         {

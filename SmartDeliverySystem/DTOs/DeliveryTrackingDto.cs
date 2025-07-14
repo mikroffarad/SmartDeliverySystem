@@ -3,7 +3,8 @@ using System;
 using System.Collections.Generic;
 
 namespace SmartDeliverySystem.DTOs
-{    public class DeliveryTrackingDto
+{
+    public class DeliveryTrackingDto
     {
         public int DeliveryId { get; set; }
         public int VendorId { get; set; } // Додаємо ID вендора

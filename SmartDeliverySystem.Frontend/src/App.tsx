@@ -270,7 +270,7 @@ const App: React.FC = () => {
             console.error('Error cancelling delivery:', error);
             alert('Error cancelling delivery. Please try again.');
         }
-    }; const handleMarkAsDelivered = async (deliveryId: number) => {
+    };    const handleMarkAsDelivered = async (deliveryId: number) => {
         if (!confirm(`Mark delivery #${deliveryId} as delivered? This will add products to store inventory.`)) {
             return;
         }
@@ -283,7 +283,47 @@ const App: React.FC = () => {
             console.error('Error marking delivery as delivered:', error);
             alert('Error marking delivery as delivered. Please try again.');
         }
+    };    const handleDeliveryArrived = (deliveryId: string) => {
+        console.log(`🎯 Delivery ${deliveryId} arrived - removing from state`);
+        setDeliveryData(prev => {
+            const updated = { ...prev };
+            delete updated[deliveryId];
+            return updated;
+        });
     };
+
+    const testArrival = async (deliveryId: number) => {
+        // Тестова функція для симуляції прибуття
+        console.log(`🧪 Testing arrival for delivery ${deliveryId}`);
+
+        const deliveryIdStr = String(deliveryId);
+        if (deliveryData[deliveryIdStr]) {
+            const delivery = deliveryData[deliveryIdStr];
+
+            // Симулюємо оновлення позиції до координат магазину
+            setDeliveryData(prev => ({
+                ...prev,
+                [deliveryIdStr]: {
+                    ...delivery,
+                    currentLatitude: delivery.storeLatitude,
+                    currentLongitude: delivery.storeLongitude,
+                    lastLocationUpdate: new Date().toISOString()
+                }
+            }));
+
+            // Через 2 секунди змінюємо статус на Delivered
+            setTimeout(() => {
+                setDeliveryData(prev => {
+                    const updated = { ...prev };
+                    delete updated[deliveryIdStr];
+                    return updated;
+                });
+            }, 5000);
+        }
+    };
+
+    // Глобальна функція для тестування
+    (window as any).testArrival = testArrival;
 
     return (
         <div className="app">
@@ -292,6 +332,7 @@ const App: React.FC = () => {
                 onShowVendorProducts={handleShowVendorProducts}
                 onShowStoreInventory={handleShowStoreInventory}
                 onCreateDelivery={handleCreateDelivery} onMarkAsDelivered={handleMarkAsDelivered}
+                onDeliveryArrived={handleDeliveryArrived}
                 isAddingMode={isAddingMode}
                 addingType={addingType}
                 refreshTrigger={refreshTrigger}
@@ -332,17 +373,6 @@ const App: React.FC = () => {
                         connectionStatus === 'disconnected' ? '🔴 Disconnected' :
                             '⚠️ Error'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-                    Debug: {Object.keys(deliveryData).length} deliveries in state
-                    {Object.keys(deliveryData).length > 0 && (
-                        <div>IDs: {Object.keys(deliveryData).join(', ')}</div>
-                    )}
-                    <button
-                        onClick={loadActiveDeliveries}
-                        style={{ fontSize: '10px', padding: '2px 6px', marginTop: '5px' }}>
-                        🔄 Reload Deliveries
-                    </button>
-                </div>
 
                 {Object.keys(deliveryData).length === 0 ? (
                     <p>No active deliveries</p>
@@ -369,7 +399,7 @@ const App: React.FC = () => {
                             </div>
                         ))}
                     </div>
-                )}            </div>            <AddLocationModal
+                )}            </div><AddLocationModal
                 isOpen={showAddModal}
                 addingType={addingType}
                 selectedLocation={selectedLocation}

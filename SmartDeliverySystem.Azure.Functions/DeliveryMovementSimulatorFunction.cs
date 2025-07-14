@@ -17,7 +17,8 @@ namespace SmartDeliverySystem.Azure.Functions
         {
             _logger = logger;
             _httpClient = httpClient;
-        }        [Function("DeliveryMovementSimulator")]
+        }
+        [Function("DeliveryMovementSimulator")]
         public async Task Run([TimerTrigger("0/1 * * * * *")] TimerInfo myTimer) // Кожну секунду
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
@@ -31,10 +32,11 @@ namespace SmartDeliverySystem.Azure.Functions
                 {
                     _logger.LogWarning("Не вдалося отримати активні доставки");
                     return;
-                }                var deliveriesJson = await response.Content.ReadAsStringAsync();
+                }
+                var deliveriesJson = await response.Content.ReadAsStringAsync();
                 // Логуємо тільки кількість доставок, а не весь JSON
                 _logger.LogInformation("📦 Отримано JSON доставок (символів: {Length})", deliveriesJson.Length);
-                
+
                 var deliveries = JsonSerializer.Deserialize<List<DeliveryTrackingData>>(deliveriesJson, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -46,12 +48,12 @@ namespace SmartDeliverySystem.Azure.Functions
                     return;
                 }
 
-                _logger.LogInformation("📋 Всього доставок: {Total}, InTransit: {InTransit}", 
+                _logger.LogInformation("📋 Всього доставок: {Total}, InTransit: {InTransit}",
                     deliveries.Count, deliveries.Count(d => d.Status == 3));
 
                 foreach (var delivery in deliveries.Where(d => d.Status == 3)) // 3 = InTransit
                 {
-                    _logger.LogInformation("🚛 Обробляю доставку {DeliveryId} зі статусом {Status}", 
+                    _logger.LogInformation("🚛 Обробляю доставку {DeliveryId} зі статусом {Status}",
                         delivery.DeliveryId, delivery.Status);
                     await SimulateDeliveryMovement(delivery);
                 }
@@ -62,7 +64,8 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 _logger.LogError(ex, "❌ Помилка при симуляції руху доставок");
             }
-        }        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
+        }
+        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
         {
             try
             {
@@ -78,11 +81,11 @@ namespace SmartDeliverySystem.Azure.Functions
 
                 // Отримуємо або створюємо маршрут
                 RouteSimulation routeSimulation;
-                
+
                 if (!_activeRoutes.ContainsKey(delivery.DeliveryId))
                 {
                     _logger.LogInformation("🗺️ Створення нового маршруту для доставки {DeliveryId}", delivery.DeliveryId);
-                    
+
                     var route = await GetRouteFromOSRM(
                         delivery.VendorLatitude.Value, delivery.VendorLongitude.Value,
                         delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
@@ -95,7 +98,7 @@ namespace SmartDeliverySystem.Azure.Functions
 
                     // Отримуємо збережений індекс з бази даних або починаємо з 0
                     var savedIndex = await GetSavedRouteIndexAsync(delivery.DeliveryId);
-                    
+
                     routeSimulation = new RouteSimulation
                     {
                         RoutePoints = route,
@@ -105,7 +108,7 @@ namespace SmartDeliverySystem.Azure.Functions
 
                     _activeRoutes[delivery.DeliveryId] = routeSimulation;
 
-                    _logger.LogInformation("✅ Створено маршрут для доставки {DeliveryId} з {PointCount} точок, починаючи з індексу {Index}", 
+                    _logger.LogInformation("✅ Створено маршрут для доставки {DeliveryId} з {PointCount} точок, починаючи з індексу {Index}",
                         delivery.DeliveryId, route.Count, savedIndex);
                 }
                 else
@@ -113,25 +116,55 @@ namespace SmartDeliverySystem.Azure.Functions
                     routeSimulation = _activeRoutes[delivery.DeliveryId];
                     _logger.LogInformation("🔄 Використовую існуючий маршрут для доставки {DeliveryId}", delivery.DeliveryId);
                 }
-                
-                // Логування прогресу
-                _logger.LogInformation("📊 Доставка {DeliveryId}: точка {CurrentIndex}/{TotalPoints}", 
-                    delivery.DeliveryId, routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count);
 
-                // Отримуємо наступну точку маршруту
+                // Логування прогресу
+                _logger.LogInformation("📊 Доставка {DeliveryId}: точка {CurrentIndex}/{TotalPoints}",
+                    delivery.DeliveryId, routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count);                // Отримуємо наступну точку маршруту
                 var nextPosition = GetNextRoutePosition(routeSimulation);
 
                 if (nextPosition == null)
                 {
-                    // Маршрут завершено
+                    // Маршрут завершено - прибуття на місце призначення
                     _logger.LogInformation("🎯 Доставка {DeliveryId} досягла призначення", delivery.DeliveryId);
                     _activeRoutes.Remove(delivery.DeliveryId);
                     await ClearSavedRouteIndexAsync(delivery.DeliveryId);
 
+                    // Відправляємо оновлення з спеціальною позначкою про прибуття
                     await UpdateDeliveryLocation(delivery.DeliveryId,
                         delivery.StoreLatitude.Value, delivery.StoreLongitude.Value,
-                        0, "🎯 Прибуття");
+                        0, "🎯 Прибуття на місце призначення");
+
+                    // Затримка 3 секунди, потім оновлюємо статус на Delivered
+                    await Task.Delay(3000);
+
+                    try
+                    {
+                        var statusUpdateContent = new StringContent("4", Encoding.UTF8, "application/json"); // 4 = Delivered
+                        var statusResponse = await _httpClient.PutAsync(
+                            $"https://localhost:7183/api/delivery/{delivery.DeliveryId}/status",
+                            statusUpdateContent);
+
+                        if (statusResponse.IsSuccessStatusCode)
+                        {
+                            _logger.LogInformation("✅ Статус доставки {DeliveryId} оновлено на Delivered", delivery.DeliveryId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("❌ Не вдалося оновити статус доставки {DeliveryId}", delivery.DeliveryId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "❌ Помилка при оновленні статусу доставки {DeliveryId}", delivery.DeliveryId);
+                    }
+
                     return;
+                }
+
+                // Перевіряємо, чи це передостання точка
+                if (routeSimulation.CurrentIndex >= routeSimulation.RoutePoints.Count - 1)
+                {
+                    _logger.LogInformation("🎯 Доставка {DeliveryId} майже прибула! Наступна точка - остання.", delivery.DeliveryId);
                 }
 
                 // Зберігаємо поточний індекс
@@ -147,7 +180,8 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 _logger.LogError(ex, "❌ Помилка симуляції руху доставки {DeliveryId}", delivery.DeliveryId);
             }
-        }private async Task<List<RoutePoint>> GetRouteFromOSRM(double fromLat, double fromLon, double toLat, double toLon)
+        }
+        private async Task<List<RoutePoint>> GetRouteFromOSRM(double fromLat, double fromLon, double toLat, double toLon)
         {
             try
             {
@@ -156,7 +190,7 @@ namespace SmartDeliverySystem.Azure.Functions
                 var url = $"http://router.project-osrm.org/route/v1/driving/{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}?overview=full&geometries=geojson";
 
                 _logger.LogInformation("🌐 OSRM URL: {Url}", url);
-                
+
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -180,15 +214,24 @@ namespace SmartDeliverySystem.Azure.Functions
                 {
                     Latitude = coord[1], // В GeoJSON спочатку longitude, потім latitude
                     Longitude = coord[0]
-                }).ToList();
-
-                // Зменшуємо кількість точок для плавнішого руху (кожна 10-а точка)
+                }).ToList();                // Зменшуємо кількість точок для плавнішого руху (кожна 10-а точка)
                 var simplifiedRoute = routePoints.Where((point, index) => index % 10 == 0).ToList();
 
-                // Додаємо кінцеву точку якщо вона не включена
-                if (simplifiedRoute.LastOrDefault()?.Latitude != routePoints.Last().Latitude)
+                // ВАЖЛИВО: Додаємо точну кінцеву точку магазину
+                var storePoint = new RoutePoint
                 {
-                    simplifiedRoute.Add(routePoints.Last());
+                    Latitude = toLat, // Точні координати магазину
+                    Longitude = toLon
+                };
+
+                // Замінюємо останню точку на точні координати магазину
+                if (simplifiedRoute.Any())
+                {
+                    simplifiedRoute[simplifiedRoute.Count - 1] = storePoint;
+                }
+                else
+                {
+                    simplifiedRoute.Add(storePoint);
                 }
 
                 return simplifiedRoute;
@@ -198,7 +241,8 @@ namespace SmartDeliverySystem.Azure.Functions
                 _logger.LogError(ex, "Помилка при отриманні маршруту з OSRM");
                 return null;
             }
-        }        private (double Latitude, double Longitude)? GetNextRoutePosition(RouteSimulation routeSimulation)
+        }
+        private (double Latitude, double Longitude)? GetNextRoutePosition(RouteSimulation routeSimulation)
         {
             if (routeSimulation.CurrentIndex >= routeSimulation.RoutePoints.Count)
             {
@@ -208,12 +252,13 @@ namespace SmartDeliverySystem.Azure.Functions
             var currentPoint = routeSimulation.RoutePoints[routeSimulation.CurrentIndex];
             routeSimulation.CurrentIndex++;
 
-            _logger.LogInformation("🎯 Переходжу до точки {Index}/{Total}: {Lat}, {Lon}", 
-                routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count, 
+            _logger.LogInformation("🎯 Переходжу до точки {Index}/{Total}: {Lat}, {Lon}",
+                routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count,
                 currentPoint.Latitude, currentPoint.Longitude);
 
             return (currentPoint.Latitude, currentPoint.Longitude);
-        }private async Task UpdateDeliveryLocation(int deliveryId, double latitude, double longitude, double speed, string notes)
+        }
+        private async Task UpdateDeliveryLocation(int deliveryId, double latitude, double longitude, double speed, string notes)
         {
             try
             {
@@ -228,7 +273,7 @@ namespace SmartDeliverySystem.Azure.Functions
                 var json = JsonSerializer.Serialize(locationUpdate);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                _logger.LogInformation("🌐 Відправляю оновлення позиції для доставки {DeliveryId}: {Lat}, {Lon}", 
+                _logger.LogInformation("🌐 Відправляю оновлення позиції для доставки {DeliveryId}: {Lat}, {Lon}",
                     deliveryId, latitude, longitude);
 
                 var updateResponse = await _httpClient.PostAsync(
@@ -242,7 +287,7 @@ namespace SmartDeliverySystem.Azure.Functions
                 else
                 {
                     var errorContent = await updateResponse.Content.ReadAsStringAsync();
-                    _logger.LogWarning("❌ Не вдалося оновити позицію доставки {DeliveryId}: {StatusCode}, {Error}", 
+                    _logger.LogWarning("❌ Не вдалося оновити позицію доставки {DeliveryId}: {StatusCode}, {Error}",
                         deliveryId, updateResponse.StatusCode, errorContent);
                 }
             }
@@ -267,7 +312,7 @@ namespace SmartDeliverySystem.Azure.Functions
                         return savedIndex;
                     }
                 }
-                
+
                 _logger.LogInformation("📍 Збережений індекс не знайдено для доставки {DeliveryId}, починаємо з 0", deliveryId);
                 return 0;
             }

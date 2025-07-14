@@ -19,6 +19,7 @@ interface MapComponentProps {
     onShowStoreInventory?: (storeId: number, storeName?: string) => void;
     onCreateDelivery?: (vendorId: number) => void;
     onMarkAsDelivered?: (deliveryId: number) => void;
+    onDeliveryArrived?: (deliveryId: string) => void; // Новий колбек для прибуття
     isAddingMode?: boolean;
     addingType?: 'vendor' | 'store' | null;
     refreshTrigger?: number;
@@ -31,6 +32,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     onShowStoreInventory,
     onCreateDelivery,
     onMarkAsDelivered,
+    onDeliveryArrived,
     isAddingMode = false,
     refreshTrigger
 }) => {
@@ -41,6 +43,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
     const deliveryMarkersRef = useRef<Record<string, L.Marker>>({});
     const deliveryRoutesRef = useRef<Record<string, L.Polyline>>({});
+    const arrivedDeliveriesRef = useRef<Set<string>>(new Set()); // Флаг для прибулих доставок
     const vendorMarkersRef = useRef<L.Marker[]>([]);
     const storeMarkersRef = useRef<L.Marker[]>([]);    // Create truck icon factory - memoized to prevent recreation
     const createTruckIcon = useCallback(() => {
@@ -64,9 +67,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             console.log('🗺️ Getting route from OSRM API');
             // Use toFixed to ensure proper decimal formatting with dot separator
             const url = `http://router.project-osrm.org/route/v1/driving/${fromLon.toFixed(6)},${fromLat.toFixed(6)};${toLon.toFixed(6)},${toLat.toFixed(6)}?overview=full&geometries=geojson`;
-            
+
             console.log('🌐 OSRM URL:', url);
-            
+
             const response = await fetch(url);
             if (!response.ok) {
                 console.warn('OSRM API request failed:', response.status);
@@ -83,7 +86,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
             const coordinates = data.routes[0].geometry.coordinates;
             const routePoints = coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
-            
+
             console.log('✅ Route obtained with', routePoints.length, 'points');
             return routePoints;
         } catch (error) {
@@ -362,21 +365,25 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         if (!mapRef.current) {
             console.log('❌ Map not ready, skipping delivery markers update');
             return;
-        }        console.log('🚛 === DELIVERY MARKERS UPDATE ===');
+        } console.log('🚛 === DELIVERY MARKERS UPDATE ===');
         const updateTime = new Date().toLocaleTimeString();
         console.log(`🚛 Update time: ${updateTime}`);
         console.log('🚛 Received deliveries:', Object.keys(deliveries));
         console.log('🚛 Current markers:', Object.keys(deliveryMarkersRef.current));
-        console.log('🚛 Map instance:', mapRef.current);
-
-        // Process each delivery
+        console.log('🚛 Map instance:', mapRef.current);        // Process each delivery
         Object.entries(deliveries).forEach(([deliveryId, delivery]) => {
             console.log(`🚛 Processing delivery ${deliveryId}:`, delivery);
+
+            // Skip if delivery has already arrived
+            if (arrivedDeliveriesRef.current.has(deliveryId)) {
+                console.log(`🚛 ⏭️ Skipping delivery ${deliveryId} - already arrived`);
+                return;
+            }
 
             if (!delivery.currentLatitude || !delivery.currentLongitude) {
                 console.log(`🚛 ❌ Delivery ${deliveryId} has no coordinates`);
                 return;
-            }            // Update or create route for this delivery ONLY ONCE
+            }// Update or create route for this delivery ONLY ONCE
             if (!deliveryRoutesRef.current[deliveryId]) {
                 console.log(`🛣️ Creating route for delivery ${deliveryId} for the first time`);
                 updateDeliveryRoute(deliveryId, delivery);
@@ -385,11 +392,102 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
 
             const existingMarker = deliveryMarkersRef.current[deliveryId];
-            console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS');
+            console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS'); if (existingMarker) {
+                // Check if truck has arrived at destination
+                if (delivery.vendorLatitude && delivery.vendorLongitude &&
+                    delivery.storeLatitude && delivery.storeLongitude) {
 
-            if (existingMarker) {
+                    const latDiff = Math.abs(delivery.storeLatitude - delivery.currentLatitude);
+                    const lngDiff = Math.abs(delivery.storeLongitude - delivery.currentLongitude);
+
+                    // Check arrival conditions with enhanced logging
+                    const isAtDestination = latDiff < 0.0005 && lngDiff < 0.0005; // Збільшено поріг
+                    const isDelivered = delivery.status === 4 || delivery.status === 'Delivered';
+                    const hasArrivalMessage = delivery.lastLocationUpdate &&
+                        String(delivery.lastLocationUpdate).includes('Прибуття'); console.log(`🎯 Delivery ${deliveryId} arrival check:`, {
+                            isAtDestination,
+                            isDelivered,
+                            hasArrivalMessage,
+                            latDiff,
+                            lngDiff,
+                            status: delivery.status,
+                            lastUpdate: delivery.lastLocationUpdate
+                        });                    // СПРОЩЕНА УМОВА: якщо вантажівка на місці призначення - показуємо прибуття
+                    if (isAtDestination) {
+                        console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);                        // Mark delivery as arrived to prevent recreation
+                        arrivedDeliveriesRef.current.add(deliveryId);
+                        console.log(`🏁 Marked delivery ${deliveryId} as arrived`);
+                        
+                        // Show arrival notification and keep truck visible for a short time
+                        existingMarker.getPopup()?.setContent(`
+                            <div>
+                                <b>🚛 Delivery #${deliveryId}</b><br>
+                                Driver: ${delivery.driverId || 'Not assigned'}<br>
+                                <strong style="color: green;">🎯 ARRIVED AT DESTINATION!</strong><br>
+                                Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
+                                Updated: ${updateTime}
+                            </div>
+                        `);                        // Auto-open popup to show arrival
+                        existingMarker.openPopup();
+                        
+                        // Notify parent component about arrival
+                        if (onDeliveryArrived) {
+                            onDeliveryArrived(deliveryId);
+                        }
+                        
+                        // Remove delivery from parent state immediately to update UI
+                        const currentDeliveries = deliveries;
+                        const updatedDeliveries = { ...currentDeliveries };
+                        delete updatedDeliveries[deliveryId];
+                        // We need to communicate this change back to the parent component
+                        // For now, we'll handle this through the normal cleanup process
+                        // Remove truck and route after 3 seconds to give user time to see arrival
+                        setTimeout(() => {
+                            console.log(`🗑️ Removing delivery ${deliveryId} after arrival display`);
+
+                            // Remove truck marker
+                            if (deliveryMarkersRef.current[deliveryId]) {
+                                mapRef.current?.removeLayer(deliveryMarkersRef.current[deliveryId]);
+                                delete deliveryMarkersRef.current[deliveryId];
+                                console.log(`🚛 ✅ Removed truck marker for delivery ${deliveryId}`);
+                            }
+
+                            // Remove route more forcefully
+                            if (deliveryRoutesRef.current[deliveryId]) {
+                                const route = deliveryRoutesRef.current[deliveryId];
+                                if (mapRef.current?.hasLayer(route)) {
+                                    mapRef.current.removeLayer(route);
+                                    console.log(`🛣️ ✅ Removed route layer for delivery ${deliveryId}`);
+                                }
+                                delete deliveryRoutesRef.current[deliveryId];
+                                console.log(`🛣️ ✅ Deleted route reference for delivery ${deliveryId}`);
+                            }
+
+                            // Force remove ALL polylines that might be related to this delivery
+                            let removedCount = 0;
+                            mapRef.current?.eachLayer((layer) => {
+                                if (layer instanceof L.Polyline) {
+                                    // Remove any polyline that looks like a delivery route
+                                    const options = (layer as any).options;
+                                    if (options.dashArray === '5, 5' || options.dashArray === '10, 10') {
+                                        mapRef.current?.removeLayer(layer);
+                                        removedCount++;
+                                        console.log(`🛣️ ✅ Force removed polyline`);
+                                    }
+                                }
+                            });
+
+                            if (removedCount > 0) {
+                                console.log(`🛣️ ✅ Force removed ${removedCount} additional polylines`);
+                            }
+                        }, 3000);
+
+                        return; // Don't continue with normal update
+                    }
+                }
+
                 // Update existing marker
-                console.log(`🚛 ➡️ Updating position for delivery ${deliveryId}`);
+                console.log(`🚛 ➡️ Updating position for delivery ${deliveryId} @ ${updateTime}`);
                 console.log(`🚛 New coordinates: [${delivery.currentLatitude}, ${delivery.currentLongitude}]`);
 
                 try {
@@ -399,7 +497,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     console.error(`🚛 ❌ Error updating position for delivery ${deliveryId}:`, error);
                 }
 
-                // Update popup
+                // Update popup with current time
                 try {
                     existingMarker.getPopup()?.setContent(`
                         <div>
@@ -407,7 +505,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             Driver: ${delivery.driverId || 'Not assigned'}<br>
                             Status: ${delivery.status}<br>
                             Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
-                            Updated: ${new Date().toLocaleTimeString()}<br>
+                            Updated: ${updateTime}<br>
                             ${delivery.status === 'InTransit' ?
                             `<button onclick="window.markAsDelivered(${deliveryId})"
                                         style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-top: 5px; border-radius: 3px; display: block; width: 100%;">
@@ -416,7 +514,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         }
                         </div>
                     `);
-                    console.log(`🚛 ✅ Updated popup for delivery ${deliveryId}`);
                 } catch (error) {
                     console.error(`🚛 ❌ Error updating popup for delivery ${deliveryId}:`, error);
                 }
@@ -470,25 +567,27 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
         // Remove markers for deliveries that no longer exist
         const currentDeliveryIds = Object.keys(deliveries);
-        const existingMarkerIds = Object.keys(deliveryMarkersRef.current);
-
-        existingMarkerIds.forEach(deliveryId => {
+        const existingMarkerIds = Object.keys(deliveryMarkersRef.current); existingMarkerIds.forEach(deliveryId => {
             if (!currentDeliveryIds.includes(deliveryId)) {
                 console.log(`🚛 🗑️ Removing marker for delivery ${deliveryId} (no longer exists)`);
                 const marker = deliveryMarkersRef.current[deliveryId];
                 const route = deliveryRoutesRef.current[deliveryId];
-                
+
                 if (marker) {
                     mapRef.current?.removeLayer(marker);
                     delete deliveryMarkersRef.current[deliveryId];
                     console.log(`🚛 ✅ Removed marker for delivery ${deliveryId}`);
                 }
-                
+
                 if (route) {
                     mapRef.current?.removeLayer(route);
                     delete deliveryRoutesRef.current[deliveryId];
                     console.log(`🚛 ✅ Removed route for delivery ${deliveryId}`);
                 }
+
+                // Also remove from arrived deliveries set
+                arrivedDeliveriesRef.current.delete(deliveryId);
+                console.log(`🏁 Removed delivery ${deliveryId} from arrived set`);
             }
         });
 
@@ -498,7 +597,25 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
         console.log('🚛 === END DELIVERY MARKERS UPDATE ===');
 
-    }, [deliveryKeys, createTruckIcon, onMarkAsDelivered, updateDeliveryRoute]);
+    }, [deliveryKeys, createTruckIcon, onMarkAsDelivered, updateDeliveryRoute]);    // Глобальна функція для очищення всіх маршрутів (для тестування)
+    (window as any).clearAllRoutes = () => {
+        console.log('🧹 Clearing all routes manually');
+        if (mapRef.current) {
+            mapRef.current.eachLayer((layer) => {
+                if (layer instanceof L.Polyline) {
+                    mapRef.current?.removeLayer(layer);
+                    console.log('🛣️ Removed polyline layer');
+                }
+            });
+        }
+        // Clear refs
+        Object.keys(deliveryRoutesRef.current).forEach(deliveryId => {
+            delete deliveryRoutesRef.current[deliveryId];
+        });
+        // Clear arrived deliveries too
+        arrivedDeliveriesRef.current.clear();
+        console.log('✅ All routes and arrived flags cleared');
+    };
 
     return <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />;
 };
