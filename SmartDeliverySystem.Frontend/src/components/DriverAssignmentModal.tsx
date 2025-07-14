@@ -120,13 +120,14 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                 }}>
                     <p><strong>Delivery ID:</strong> {deliveryId}</p>
                     <p><strong>Status:</strong> Paid ✅</p>
-                    
+
                     <div style={{
                         backgroundColor: '#e9f7ef',
                         border: '1px solid #c3e6cb',
                         borderRadius: '5px',
                         padding: '10px',
                         marginBottom: '15px',
+                        marginTop: '15px',
                         fontSize: '14px'
                     }}>
                         <strong>ℹ️ Note:</strong> Driver and GPS Tracker IDs are automatically generated based on the delivery ID.
@@ -138,11 +139,11 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                             value={driverId}
                             readOnly
                             placeholder="Auto-generated based on delivery ID"
-                            style={{ 
-                                width: '100%', 
-                                padding: '10px', 
-                                margin: '8px 0', 
-                                borderRadius: '5px', 
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                margin: '8px 0',
+                                borderRadius: '5px',
                                 border: '1px solid #ddd',
                                 backgroundColor: '#f8f9fa',
                                 color: '#495057'
@@ -158,11 +159,11 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                             value={gpsTrackerId}
                             readOnly
                             placeholder="Auto-generated based on delivery ID"
-                            style={{ 
-                                width: '100%', 
-                                padding: '10px', 
-                                margin: '8px 0', 
-                                borderRadius: '5px', 
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                margin: '8px 0',
+                                borderRadius: '5px',
                                 border: '1px solid #ddd',
                                 backgroundColor: '#f8f9fa',
                                 color: '#495057'

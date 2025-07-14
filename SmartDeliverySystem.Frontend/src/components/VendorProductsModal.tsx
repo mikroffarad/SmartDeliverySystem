@@ -18,12 +18,31 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [showAddProduct, setShowAddProduct] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
+    const [bulkMode, setBulkMode] = useState(false); // Новий стан для bulk режиму
+    const [csvData, setCsvData] = useState(''); // Для CSV даних
     const [newProduct, setNewProduct] = useState({
         name: '',
         weight: 0,
         category: '',
         price: 0
     });
+
+    // Попередньо визначені категорії
+    const predefinedCategories = [
+        'Bakery',
+        'Dairy',
+        'Meat',
+        'Seafood',
+        'Fruits',
+        'Vegetables',
+        'Frozen Foods',
+        'Beverages',
+        'Snacks',
+        'Health',
+        'Beauty',
+        'Household Items',
+        'Other'
+    ];
 
     useEffect(() => {
         if (isOpen && vendorId) {
@@ -66,6 +85,84 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
         } catch (error) {
             console.error('Error adding product:', error);
             alert('Error adding product. Please try again.');
+        }
+    };
+
+    // Функція для обробки CSV даних
+    const handleBulkAdd = async () => {
+        if (!vendorId || !csvData.trim()) {
+            alert('Please enter CSV data');
+            return;
+        }
+
+        const lines = csvData.trim().split('\n');
+        const products = [];
+        let errorLines = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = line.split(',').map(part => part.trim());
+            if (parts.length !== 4) {
+                errorLines.push(`Line ${i + 1}: Expected 4 columns, got ${parts.length}`);
+                continue;
+            }
+
+            const [name, category, weight, price] = parts;
+
+            // Перевіряємо категорію
+            if (!predefinedCategories.includes(category)) {
+                errorLines.push(`Line ${i + 1}: Invalid category "${category}". Must be one of: ${predefinedCategories.join(', ')}`);
+                continue;
+            }
+
+            // Перевіряємо числові значення
+            const weightNum = parseFloat(weight);
+            const priceNum = parseFloat(price);
+
+            if (isNaN(weightNum) || weightNum < 0) {
+                errorLines.push(`Line ${i + 1}: Invalid weight "${weight}"`);
+                continue;
+            }
+
+            if (isNaN(priceNum) || priceNum <= 0) {
+                errorLines.push(`Line ${i + 1}: Invalid price "${price}"`);
+                continue;
+            }
+
+            products.push({
+                name,
+                category,
+                weight: weightNum,
+                price: priceNum
+            });
+        }
+
+        if (errorLines.length > 0) {
+            alert(`Found errors in CSV data:\n\n${errorLines.join('\n')}`);
+            return;
+        }
+
+        if (products.length === 0) {
+            alert('No valid products found in CSV data');
+            return;
+        }
+
+        try {
+            // Додаємо всі продукти
+            for (const product of products) {
+                await deliveryApi.addProductToVendor(vendorId, product);
+            }
+
+            alert(`✅ Successfully added ${products.length} products!`);
+            setCsvData('');
+            setShowAddProduct(false);
+            setBulkMode(false);
+            loadVendorProducts(); // Refresh list
+        } catch (error) {
+            console.error('Error adding products:', error);
+            alert('Error adding products. Please try again.');
         }
     };
 
@@ -113,11 +210,11 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
             console.error('Error deleting product:', error);
             alert('Error deleting product. Please try again.');
         }
-    };
-
-    const handleCancelEdit = () => {
+    }; const handleCancelEdit = () => {
         setShowAddProduct(false);
         setEditingProduct(null);
+        setBulkMode(false);
+        setCsvData('');
         setNewProduct({ name: '', weight: 0, category: '', price: 0 });
     };
 
@@ -206,17 +303,29 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                 </div>
                             ))}
                             </div>
-                        )}
-
-                        <div className="form-actions" style={{ marginTop: '20px' }}>
+                        )}                        <div className="form-actions" style={{ marginTop: '20px' }}>
                             <button className="btn-secondary" onClick={onClose}>
                                 Close
                             </button>
                             <button
                                 className="btn-primary"
-                                onClick={() => setShowAddProduct(true)}
+                                onClick={() => {
+                                    setBulkMode(false);
+                                    setShowAddProduct(true);
+                                }}
+                                style={{ marginLeft: '10px' }}
                             >
-                                ➕ Add Product
+                                ➕ Add Single Product
+                            </button>
+                            <button
+                                className="btn-primary"
+                                onClick={() => {
+                                    setBulkMode(true);
+                                    setShowAddProduct(true);
+                                }}
+                                style={{ marginLeft: '10px', backgroundColor: '#17a2b8' }}
+                            >
+                                📝 Add Multiple Products (CSV)
                             </button>
                         </div>
 
@@ -232,61 +341,101 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                 <h4 style={{ marginBottom: '15px' }}>
                                     {editingProduct ? 'Edit Product' : 'Add New Product'}
                                 </h4>
-                                <div style={{ marginBottom: '10px' }}>
-                                    <label style={{ display: 'block', marginBottom: '5px' }}>Product Name:</label>
-                                    <input
-                                        type="text"
-                                        value={newProduct.name}
-                                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                                        style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                                        placeholder="Enter product name"
-                                    />
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
-                                        <input
-                                            type="text"
-                                            value={newProduct.category}
-                                            onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                                            placeholder="e.g. Bakery, Dairy"
-                                        />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '5px' }}>Weight (kg):</label>
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={newProduct.weight}
-                                            onChange={(e) => setNewProduct({ ...newProduct, weight: parseFloat(e.target.value) || 0 })}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                                        />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '5px' }}>Price ($):</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={newProduct.price}
-                                            onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
-                                            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                                        />
-                                    </div>
-                                </div>                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                    <button
-                                        onClick={handleCancelEdit}
-                                        style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
-                                        style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}
-                                    >
-                                        {editingProduct ? 'Update Product' : 'Save Product'}
-                                    </button>
-                                </div>
+                                {!bulkMode ? (
+                                    <>
+                                        <div style={{ marginBottom: '10px' }}>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>Product Name:</label>
+                                            <input
+                                                type="text"
+                                                value={newProduct.name}
+                                                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                                                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                                                placeholder="Enter product name"
+                                            />
+                                        </div>                                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
+                                                <select
+                                                    value={newProduct.category}
+                                                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                                                >
+                                                    <option value="">Select a category</option>
+                                                    {predefinedCategories.map(category => (
+                                                        <option key={category} value={category}>{category}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={{ display: 'block', marginBottom: '5px' }}>Weight (kg):</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={newProduct.weight}
+                                                    onChange={(e) => setNewProduct({ ...newProduct, weight: parseFloat(e.target.value) || 0 })}
+                                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                                                />
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <label style={{ display: 'block', marginBottom: '5px' }}>Price ($):</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={newProduct.price}
+                                                    onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
+                                                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                                                />
+                                            </div>
+                                        </div><div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
+                                                style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}
+                                            >
+                                                {editingProduct ? 'Update Product' : 'Save Product'}
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#e7f3ff', borderRadius: '5px', fontSize: '14px' }}>
+                                            <strong>CSV Format:</strong> name,category,weight,price<br />
+                                            <strong>Available categories:</strong> {predefinedCategories.join(', ')}<br />
+                                            <strong>Example:</strong><br />
+                                            Fresh Bread,Bakery,0.5,3.50<br />
+                                            Whole Milk,Dairy,1.0,2.99<br />
+                                            Chicken Breast,Meat,0.8,8.99
+                                        </div>
+                                        <div style={{ marginBottom: '10px' }}>
+                                            <label style={{ display: 'block', marginBottom: '5px' }}>CSV Data:</label>
+                                            <textarea
+                                                value={csvData}
+                                                onChange={(e) => setCsvData(e.target.value)}
+                                                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', minHeight: '120px', fontFamily: 'monospace' }}
+                                                placeholder="Enter CSV data (name,category,weight,price)"
+                                            />
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleBulkAdd}
+                                                style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}
+                                            >
+                                                Add Products
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>

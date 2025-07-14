@@ -186,7 +186,10 @@ export const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({
                                                         padding: '4px 8px',
                                                         backgroundColor: '#e9ecef',
                                                         borderRadius: '12px',
-                                                        fontSize: '12px'
+                                                        fontSize: '12px',
+                                                        display: 'flex',
+                                                        justifyContent: 'center',
+                                                        textAlign: 'center',
                                                     }}>
                                                         {item.category}
                                                     </span>
