@@ -175,9 +175,25 @@ namespace SmartDeliverySystem.Controllers
         [HttpPost("{id}/update-location")]
         public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
         {
+            _logger.LogInformation("🌍 UpdateLocation endpoint викликано для доставки {DeliveryId} з координатами {Lat}, {Lon}", 
+                id, locationUpdate.Latitude, locationUpdate.Longitude);
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("❌ Невалідні дані для оновлення локації доставки {DeliveryId}", id);
+                return BadRequest(ModelState);
+            }
+
             var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
             if (!result)
-                return NotFound("Delivery not found.");            // Send GPS update to Azure Service Bus for real-time processing
+            {
+                _logger.LogWarning("❌ Не вдалося оновити локацію для доставки {DeliveryId}", id);
+                return NotFound("Delivery not found.");
+            }
+
+            _logger.LogInformation("✅ Локація успішно оновлена для доставки {DeliveryId}", id);
+
+            // Send GPS update to Azure Service Bus for real-time processing
             try
             {
                 await _serviceBusService.SendLocationUpdateAsync(new
@@ -258,6 +274,113 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogError(ex, "Error getting location history for delivery {DeliveryId}", deliveryId);
                 return BadRequest($"Error getting location history: {ex.Message}");
             }
+        }
+
+        [HttpPost("test-movement/{deliveryId}")]
+        public async Task<ActionResult> TestMovement(int deliveryId)
+        {
+            _logger.LogInformation("🧪 Test movement endpoint викликано для доставки {DeliveryId}", deliveryId);
+
+            var delivery = await _deliveryService.GetDeliveryAsync(deliveryId);
+            if (delivery == null)
+            {
+                return NotFound("Delivery not found");
+            }
+
+            // Симулюємо рух на 0.001 градусів на північ
+            var currentLat = delivery.CurrentLatitude ?? delivery.FromLatitude ?? 0;
+            var currentLon = delivery.CurrentLongitude ?? delivery.FromLongitude ?? 0;
+            
+            var newLat = currentLat + 0.001;
+            var newLon = currentLon + 0.001;
+
+            var locationUpdate = new LocationUpdateDto
+            {
+                Latitude = newLat,
+                Longitude = newLon,
+                Speed = 30,
+                Notes = "🧪 Тестове переміщення"
+            };
+
+            var result = await _deliveryService.UpdateLocationAsync(deliveryId, locationUpdate);
+            if (!result)
+            {
+                return BadRequest("Failed to update location");
+            }
+
+            // Відправляємо SignalR оновлення
+            try
+            {
+                await _signalRService.SendLocationUpdateAsync(deliveryId, newLat, newLon, "🧪 Тестове переміщення");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при відправці SignalR оновлення");
+            }
+
+            return Ok(new { 
+                message = "Test movement completed",
+                oldPosition = new { lat = currentLat, lon = currentLon },
+                newPosition = new { lat = newLat, lon = newLon }
+            });
+        }        [HttpGet("{deliveryId}/route-index")]
+        public ActionResult<string> GetRouteIndex(int deliveryId)
+        {
+            try
+            {
+                // Простий підхід: зберігаємо індекс у тимчасовому кеші або базі даних
+                // Для простоти використаємо статичний Dictionary
+                if (RouteIndexCache.TryGetValue(deliveryId, out int index))
+                {
+                    return Ok(index.ToString());
+                }
+                return NotFound();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при отриманні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                return StatusCode(500);
+            }
+        }
+
+        [HttpPost("{deliveryId}/route-index")]
+        public ActionResult SaveRouteIndex(int deliveryId, [FromBody] RouteIndexDto dto)
+        {
+            try
+            {
+                RouteIndexCache[deliveryId] = dto.Index;
+                _logger.LogInformation("💾 Збережено індекс маршруту {Index} для доставки {DeliveryId}", dto.Index, deliveryId);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при збереженні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                return StatusCode(500);
+            }
+        }
+
+        [HttpDelete("{deliveryId}/route-index")]
+        public ActionResult ClearRouteIndex(int deliveryId)
+        {
+            try
+            {
+                RouteIndexCache.Remove(deliveryId);
+                _logger.LogInformation("🗑️ Очищено індекс маршруту для доставки {DeliveryId}", deliveryId);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при очищенні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                return StatusCode(500);
+            }
+        }
+
+        // Статичний кеш для збереження індексів маршрутів
+        private static readonly Dictionary<int, int> RouteIndexCache = new();
+
+        public class RouteIndexDto
+        {
+            public int Index { get; set; }
         }
     }
 }

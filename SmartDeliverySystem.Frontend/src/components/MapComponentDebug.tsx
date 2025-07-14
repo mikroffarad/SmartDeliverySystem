@@ -40,10 +40,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     const [stores, setStores] = useState<StoreData[]>([]);
 
     const deliveryMarkersRef = useRef<Record<string, L.Marker>>({});
+    const deliveryRoutesRef = useRef<Record<string, L.Polyline>>({});
     const vendorMarkersRef = useRef<L.Marker[]>([]);
-    const storeMarkersRef = useRef<L.Marker[]>([]);
-
-    // Create truck icon factory - memoized to prevent recreation
+    const storeMarkersRef = useRef<L.Marker[]>([]);    // Create truck icon factory - memoized to prevent recreation
     const createTruckIcon = useCallback(() => {
         console.log('🏗️ Creating truck icon');
         try {
@@ -59,7 +58,103 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             console.error('❌ Error creating truck icon:', error);
             return new L.Icon.Default();
         }
-    }, []);    // Initialize map only once
+    }, []);    // Get route from OSRM API
+    const getRouteFromOSRM = useCallback(async (fromLat: number, fromLon: number, toLat: number, toLon: number) => {
+        try {
+            console.log('🗺️ Getting route from OSRM API');
+            // Use toFixed to ensure proper decimal formatting with dot separator
+            const url = `http://router.project-osrm.org/route/v1/driving/${fromLon.toFixed(6)},${fromLat.toFixed(6)};${toLon.toFixed(6)},${toLat.toFixed(6)}?overview=full&geometries=geojson`;
+            
+            console.log('🌐 OSRM URL:', url);
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn('OSRM API request failed:', response.status);
+                const errorText = await response.text();
+                console.warn('OSRM Error:', errorText);
+                return null;
+            }
+
+            const data = await response.json();
+            if (!data.routes || data.routes.length === 0) {
+                console.warn('OSRM returned empty route');
+                return null;
+            }
+
+            const coordinates = data.routes[0].geometry.coordinates;
+            const routePoints = coordinates.map((coord: number[]) => [coord[1], coord[0]] as [number, number]);
+            
+            console.log('✅ Route obtained with', routePoints.length, 'points');
+            return routePoints;
+        } catch (error) {
+            console.error('❌ Error getting route from OSRM:', error);
+            return null;
+        }
+    }, []);    // Create or update delivery route
+    const updateDeliveryRoute = useCallback(async (deliveryId: string, delivery: DeliveryData) => {
+        if (!mapRef.current) return;
+
+        console.log('🛣️ Updating route for delivery', deliveryId);
+        console.log('🛣️ Delivery data:', delivery);
+
+        // Find vendor and store coordinates
+        const vendor = vendors.find(v => v.id === delivery.vendorId);
+        const store = stores.find(s => s.id === delivery.storeId);
+
+        console.log('🛣️ Found vendor:', vendor);
+        console.log('🛣️ Found store:', store);
+        console.log('🛣️ Available vendors:', vendors.map(v => ({ id: v.id, name: v.name })));
+        console.log('🛣️ Available stores:', stores.map(s => ({ id: s.id, name: s.name })));
+
+        if (!vendor || !store || !vendor.latitude || !vendor.longitude || !store.latitude || !store.longitude) {
+            console.log('❌ Missing vendor or store coordinates for delivery', deliveryId);
+            console.log('❌ Vendor found:', !!vendor, 'Store found:', !!store);
+            if (vendor) console.log('❌ Vendor coordinates:', vendor.latitude, vendor.longitude);
+            if (store) console.log('❌ Store coordinates:', store.latitude, store.longitude);
+            return;
+        }
+
+        // Remove existing route
+        const existingRoute = deliveryRoutesRef.current[deliveryId];
+        if (existingRoute) {
+            mapRef.current.removeLayer(existingRoute);
+            delete deliveryRoutesRef.current[deliveryId];
+        }
+
+        // Get route from OSRM
+        const routePoints = await getRouteFromOSRM(
+            vendor.latitude, vendor.longitude,
+            store.latitude, store.longitude
+        );
+
+        if (routePoints) {
+            // Create polyline for the route
+            const route = L.polyline(routePoints, {
+                color: '#007bff',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '5, 5' // Dashed line to distinguish from other lines
+            }).addTo(mapRef.current);
+
+            // Add route to ref
+            deliveryRoutesRef.current[deliveryId] = route;
+            console.log('✅ Route created for delivery', deliveryId);
+        } else {
+            // Fallback: create simple straight line
+            const straightLine = L.polyline([
+                [vendor.latitude, vendor.longitude],
+                [store.latitude, store.longitude]
+            ], {
+                color: '#dc3545',
+                weight: 2,
+                opacity: 0.5,
+                dashArray: '10, 10'
+            }).addTo(mapRef.current);
+
+            deliveryRoutesRef.current[deliveryId] = straightLine;
+            console.log('⚠️ Fallback straight line created for delivery', deliveryId);
+        }
+    }, [vendors, stores, getRouteFromOSRM]);// Initialize map only once
     useEffect(() => {
         console.log('🗺️ Map initialization useEffect called');
         console.log('🗺️ mapContainer.current:', mapContainer.current);
@@ -109,19 +204,20 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 mapRef.current.off('click', handleMapClick);
             }
         };
-    }, [onLocationSelect]);
-
-    // Load vendors and stores
+    }, [onLocationSelect]);    // Load vendors and stores
     const loadVendorsAndStores = async () => {
         try {
+            console.log('🔄 Loading vendors and stores...');
             const [vendorsData, storesData] = await Promise.all([
                 deliveryApi.getAllVendors(),
                 deliveryApi.getAllStores()
             ]);
+            console.log('✅ Loaded vendors:', vendorsData);
+            console.log('✅ Loaded stores:', storesData);
             setVendors(vendorsData);
             setStores(storesData);
         } catch (error) {
-            console.error('Error loading vendors and stores:', error);
+            console.error('❌ Error loading vendors and stores:', error);
         }
     };
 
@@ -216,7 +312,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         stores.forEach(store => {
             if (store.latitude && store.longitude) {
                 const storeIcon = L.icon({
-                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
+                    iconUrl: 'src/images/store128.png',
                     iconSize: [28, 28],
                     iconAnchor: [14, 28],
                     popupAnchor: [0, -28]
@@ -258,9 +354,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     }, [stores, onShowStoreInventory]);
 
     // Memoize delivery keys for comparison
-    const deliveryKeys = useMemo(() => Object.keys(deliveries).sort().join(','), [deliveries]);
-
-    // Handle delivery markers with ULTRA DETAILED LOGGING
+    const deliveryKeys = useMemo(() => Object.keys(deliveries).sort().join(','), [deliveries]);    // Handle delivery markers with ULTRA DETAILED LOGGING
     useEffect(() => {
         if (!mapRef.current) {
             console.log('❌ Map not ready, skipping delivery markers update');
@@ -280,6 +374,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 console.log(`🚛 ❌ Delivery ${deliveryId} has no coordinates`);
                 return;
             }
+
+            // Update or create route for this delivery
+            updateDeliveryRoute(deliveryId, delivery);
 
             const existingMarker = deliveryMarkersRef.current[deliveryId];
             console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS');
@@ -373,10 +470,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             if (!currentDeliveryIds.includes(deliveryId)) {
                 console.log(`🚛 🗑️ Removing marker for delivery ${deliveryId} (no longer exists)`);
                 const marker = deliveryMarkersRef.current[deliveryId];
+                const route = deliveryRoutesRef.current[deliveryId];
+                
                 if (marker) {
                     mapRef.current?.removeLayer(marker);
                     delete deliveryMarkersRef.current[deliveryId];
                     console.log(`🚛 ✅ Removed marker for delivery ${deliveryId}`);
+                }
+                
+                if (route) {
+                    mapRef.current?.removeLayer(route);
+                    delete deliveryRoutesRef.current[deliveryId];
+                    console.log(`🚛 ✅ Removed route for delivery ${deliveryId}`);
                 }
             }
         });
@@ -387,7 +492,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
         console.log('🚛 === END DELIVERY MARKERS UPDATE ===');
 
-    }, [deliveryKeys, createTruckIcon, onMarkAsDelivered]);
+    }, [deliveryKeys, createTruckIcon, onMarkAsDelivered, updateDeliveryRoute]);
 
     return <div ref={mapContainer} style={{ height: '100%', width: '100%' }} />;
 };

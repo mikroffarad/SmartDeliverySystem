@@ -11,15 +11,14 @@ namespace SmartDeliverySystem.Azure.Functions
     {
         private readonly ILogger<DeliveryMovementSimulatorFunction> _logger;
         private readonly HttpClient _httpClient;
+        private readonly Dictionary<int, RouteSimulation> _activeRoutes = new();
 
         public DeliveryMovementSimulatorFunction(ILogger<DeliveryMovementSimulatorFunction> logger, HttpClient httpClient)
         {
             _logger = logger;
             _httpClient = httpClient;
-        }
-
-        [Function("DeliveryMovementSimulator")]
-        public async Task Run([TimerTrigger("0/1 * * * * *")] TimerInfo myTimer) // Кожні 5 секунд
+        }        [Function("DeliveryMovementSimulator")]
+        public async Task Run([TimerTrigger("0/1 * * * * *")] TimerInfo myTimer) // Кожну секунду
         {
             _logger.LogInformation("🚛 Запуск симуляції руху доставок...");
 
@@ -31,9 +30,10 @@ namespace SmartDeliverySystem.Azure.Functions
                 {
                     _logger.LogWarning("Не вдалося отримати активні доставки");
                     return;
-                }
-
-                var deliveriesJson = await response.Content.ReadAsStringAsync();
+                }                var deliveriesJson = await response.Content.ReadAsStringAsync();
+                // Логуємо тільки кількість доставок, а не весь JSON
+                _logger.LogInformation("📦 Отримано JSON доставок (символів: {Length})", deliveriesJson.Length);
+                
                 var deliveries = JsonSerializer.Deserialize<List<DeliveryTrackingData>>(deliveriesJson, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -44,8 +44,14 @@ namespace SmartDeliverySystem.Azure.Functions
                     _logger.LogInformation("Немає активних доставок для симуляції");
                     return;
                 }
+
+                _logger.LogInformation("📋 Всього доставок: {Total}, InTransit: {InTransit}", 
+                    deliveries.Count, deliveries.Count(d => d.Status == 3));
+
                 foreach (var delivery in deliveries.Where(d => d.Status == 3)) // 3 = InTransit
                 {
+                    _logger.LogInformation("🚛 Обробляю доставку {DeliveryId} зі статусом {Status}", 
+                        delivery.DeliveryId, delivery.Status);
                     await SimulateDeliveryMovement(delivery);
                 }
 
@@ -55,114 +61,288 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 _logger.LogError(ex, "❌ Помилка при симуляції руху доставок");
             }
-        }
-        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
+        }        private async Task SimulateDeliveryMovement(DeliveryTrackingData delivery)
         {
             try
             {
+                _logger.LogInformation("🚛 === Симуляція руху для доставки {DeliveryId} ===", delivery.DeliveryId);
+
                 // Перевіряємо, чи є всі необхідні координати
                 if (!delivery.VendorLatitude.HasValue || !delivery.VendorLongitude.HasValue ||
-                    !delivery.StoreLatitude.HasValue || !delivery.StoreLongitude.HasValue ||
-                    !delivery.CurrentLatitude.HasValue || !delivery.CurrentLongitude.HasValue)
+                    !delivery.StoreLatitude.HasValue || !delivery.StoreLongitude.HasValue)
                 {
                     _logger.LogWarning("Доставка {DeliveryId} не має всіх необхідних координат", delivery.DeliveryId);
                     return;
                 }
 
-                // Розраховуємо нову позицію
-                var newPosition = CalculateNextPosition(
-                    delivery.CurrentLatitude.Value, delivery.CurrentLongitude.Value,
-                    delivery.StoreLatitude.Value, delivery.StoreLongitude.Value,
-                    speedKmh: 50 // швидкість 50 км/год
-                );
-
-                // Перевіряємо, чи прибули на місце призначення
-                var distanceToDestination = CalculateDistance(
-                    newPosition.Latitude, newPosition.Longitude,
-                    delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
-
-                string notes;
-                if (distanceToDestination < 0.05) // Менше 50 метрів від магазину
+                // Отримуємо або створюємо маршрут
+                RouteSimulation routeSimulation;
+                
+                if (!_activeRoutes.ContainsKey(delivery.DeliveryId))
                 {
-                    notes = "🎯 Прибуття на місце призначення";
-                    // Встановлюємо точні координати магазину
-                    newPosition = (delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
+                    _logger.LogInformation("🗺️ Створення нового маршруту для доставки {DeliveryId}", delivery.DeliveryId);
+                    
+                    var route = await GetRouteFromOSRM(
+                        delivery.VendorLatitude.Value, delivery.VendorLongitude.Value,
+                        delivery.StoreLatitude.Value, delivery.StoreLongitude.Value);
+
+                    if (route == null || !route.Any())
+                    {
+                        _logger.LogWarning("❌ Не вдалося отримати маршрут для доставки {DeliveryId}", delivery.DeliveryId);
+                        return;
+                    }
+
+                    // Отримуємо збережений індекс з бази даних або починаємо з 0
+                    var savedIndex = await GetSavedRouteIndexAsync(delivery.DeliveryId);
+                    
+                    routeSimulation = new RouteSimulation
+                    {
+                        RoutePoints = route,
+                        CurrentIndex = savedIndex,
+                        StartTime = DateTime.UtcNow
+                    };
+
+                    _activeRoutes[delivery.DeliveryId] = routeSimulation;
+
+                    _logger.LogInformation("✅ Створено маршрут для доставки {DeliveryId} з {PointCount} точок, починаючи з індексу {Index}", 
+                        delivery.DeliveryId, route.Count, savedIndex);
                 }
                 else
                 {
-                    notes = "🚛 Автоматичне оновлення позиції";
+                    routeSimulation = _activeRoutes[delivery.DeliveryId];
+                    _logger.LogInformation("🔄 Використовую існуючий маршрут для доставки {DeliveryId}", delivery.DeliveryId);
+                }
+                
+                // Логування прогресу
+                _logger.LogInformation("📊 Доставка {DeliveryId}: точка {CurrentIndex}/{TotalPoints}", 
+                    delivery.DeliveryId, routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count);
+
+                // Отримуємо наступну точку маршруту
+                var nextPosition = GetNextRoutePosition(routeSimulation);
+
+                if (nextPosition == null)
+                {
+                    // Маршрут завершено
+                    _logger.LogInformation("🎯 Доставка {DeliveryId} досягла призначення", delivery.DeliveryId);
+                    _activeRoutes.Remove(delivery.DeliveryId);
+                    await ClearSavedRouteIndexAsync(delivery.DeliveryId);
+
+                    await UpdateDeliveryLocation(delivery.DeliveryId,
+                        delivery.StoreLatitude.Value, delivery.StoreLongitude.Value,
+                        0, "🎯 Прибуття");
+                    return;
                 }
 
-                // Відправляємо оновлення координат
+                // Зберігаємо поточний індекс
+                await SaveRouteIndexAsync(delivery.DeliveryId, routeSimulation.CurrentIndex);
+
+                // Оновлюємо позицію доставки
+                await UpdateDeliveryLocation(delivery.DeliveryId,
+                    nextPosition.Value.Latitude, nextPosition.Value.Longitude,
+                    50, "🚛 Рух");
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Помилка симуляції руху доставки {DeliveryId}", delivery.DeliveryId);
+            }
+        }private async Task<List<RoutePoint>> GetRouteFromOSRM(double fromLat, double fromLon, double toLat, double toLon)
+        {
+            try
+            {
+                // Використовуємо публічний OSRM API для отримання маршруту
+                // Важливо: використовуємо InvariantCulture для правильного форматування координат (крапка замість коми)
+                var url = $"http://router.project-osrm.org/route/v1/driving/{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}?overview=full&geometries=geojson";
+
+                _logger.LogInformation("🌐 OSRM URL: {Url}", url);
+                
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("OSRM API запит не вдався: {StatusCode}", response.StatusCode);
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning("OSRM Error: {Error}", errorContent);
+                    return null;
+                }
+
+                var jsonContent = await response.Content.ReadAsStringAsync();
+                var osrmResponse = JsonSerializer.Deserialize<OSRMResponse>(jsonContent);
+
+                if (osrmResponse?.routes == null || !osrmResponse.routes.Any())
+                {
+                    _logger.LogWarning("OSRM повернув порожній маршрут");
+                    return null;
+                }
+
+                var coordinates = osrmResponse.routes[0].geometry.coordinates;
+                var routePoints = coordinates.Select(coord => new RoutePoint
+                {
+                    Latitude = coord[1], // В GeoJSON спочатку longitude, потім latitude
+                    Longitude = coord[0]
+                }).ToList();
+
+                // Зменшуємо кількість точок для плавнішого руху (кожна 10-а точка)
+                var simplifiedRoute = routePoints.Where((point, index) => index % 10 == 0).ToList();
+
+                // Додаємо кінцеву точку якщо вона не включена
+                if (simplifiedRoute.LastOrDefault()?.Latitude != routePoints.Last().Latitude)
+                {
+                    simplifiedRoute.Add(routePoints.Last());
+                }
+
+                return simplifiedRoute;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Помилка при отриманні маршруту з OSRM");
+                return null;
+            }
+        }        private (double Latitude, double Longitude)? GetNextRoutePosition(RouteSimulation routeSimulation)
+        {
+            if (routeSimulation.CurrentIndex >= routeSimulation.RoutePoints.Count)
+            {
+                return null; // Маршрут завершено
+            }
+
+            var currentPoint = routeSimulation.RoutePoints[routeSimulation.CurrentIndex];
+            routeSimulation.CurrentIndex++;
+
+            _logger.LogInformation("🎯 Переходжу до точки {Index}/{Total}: {Lat}, {Lon}", 
+                routeSimulation.CurrentIndex, routeSimulation.RoutePoints.Count, 
+                currentPoint.Latitude, currentPoint.Longitude);
+
+            return (currentPoint.Latitude, currentPoint.Longitude);
+        }private async Task UpdateDeliveryLocation(int deliveryId, double latitude, double longitude, double speed, string notes)
+        {
+            try
+            {
                 var locationUpdate = new
                 {
-                    latitude = newPosition.Latitude,
-                    longitude = newPosition.Longitude,
-                    speed = distanceToDestination < 0.05 ? 0.0 : 50.0, // Швидкість 0 при прибутті
+                    latitude = latitude,
+                    longitude = longitude,
+                    speed = speed,
                     notes = notes
                 };
 
                 var json = JsonSerializer.Serialize(locationUpdate);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+                _logger.LogInformation("🌐 Відправляю оновлення позиції для доставки {DeliveryId}: {Lat}, {Lon}", 
+                    deliveryId, latitude, longitude);
+
                 var updateResponse = await _httpClient.PostAsync(
-                    $"https://localhost:7183/api/delivery/{delivery.DeliveryId}/update-location",
+                    $"https://localhost:7183/api/delivery/{deliveryId}/update-location",
                     content);
 
                 if (updateResponse.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("📍 Оновлено позицію доставки {DeliveryId}: {Lat}, {Lon} - {Notes}",
-                        delivery.DeliveryId, newPosition.Latitude, newPosition.Longitude, notes);
+                    _logger.LogInformation("✅ Успішно оновлено позицію доставки {DeliveryId}", deliveryId);
                 }
                 else
                 {
-                    _logger.LogWarning("Не вдалося оновити позицію доставки {DeliveryId}", delivery.DeliveryId);
+                    var errorContent = await updateResponse.Content.ReadAsStringAsync();
+                    _logger.LogWarning("❌ Не вдалося оновити позицію доставки {DeliveryId}: {StatusCode}, {Error}", 
+                        deliveryId, updateResponse.StatusCode, errorContent);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Помилка при симуляції руху доставки {DeliveryId}", delivery.DeliveryId);
+                _logger.LogError(ex, "❌ Помилка при оновленні позиції доставки {DeliveryId}", deliveryId);
             }
         }
 
-        private (double Latitude, double Longitude) CalculateNextPosition(
-            double currentLat, double currentLon,
-            double targetLat, double targetLon,
-            double speedKmh)
+        private async Task<int> GetSavedRouteIndexAsync(int deliveryId)
         {
-            // Розрахунок відстані до цілі
-            var distance = CalculateDistance(currentLat, currentLon, targetLat, targetLon);
-
-            // Якщо дуже близько до цілі (менше 50 метрів), повертаємо координати цілі
-            if (distance < 0.05) // 50 метрів
+            try
             {
-                return (targetLat, targetLon);
+                // Простий підхід: використовуємо HTTP запит до API для отримання збереженого індексу
+                var response = await _httpClient.GetAsync($"https://localhost:7183/api/delivery/{deliveryId}/route-index");
+                if (response.IsSuccessStatusCode)
+                {
+                    var indexString = await response.Content.ReadAsStringAsync();
+                    if (int.TryParse(indexString, out int savedIndex))
+                    {
+                        _logger.LogInformation("📍 Знайдено збережений індекс {Index} для доставки {DeliveryId}", savedIndex, deliveryId);
+                        return savedIndex;
+                    }
+                }
+                
+                _logger.LogInformation("📍 Збережений індекс не знайдено для доставки {DeliveryId}, починаємо з 0", deliveryId);
+                return 0;
             }
-
-            // Розрахунок швидкості в координатах за 5 секунд
-            var speedPerSecond = speedKmh / 3600.0; // км/сек
-            var distanceToMove = speedPerSecond * 5; // відстань за 5 секунд
-
-            // Обчислення пропорції руху
-            var movementRatio = Math.Min(distanceToMove / distance, 1.0);
-
-            // Нові координати
-            var newLat = currentLat + (targetLat - currentLat) * movementRatio;
-            var newLon = currentLon + (targetLon - currentLon) * movementRatio;
-
-            return (newLat, newLon);
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "❌ Помилка при отриманні збереженого індексу для доставки {DeliveryId}", deliveryId);
+                return 0;
+            }
         }
 
-        private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        private async Task SaveRouteIndexAsync(int deliveryId, int currentIndex)
         {
-            var dLat = (lat2 - lat1) * Math.PI / 180;
-            var dLon = (lon2 - lon1) * Math.PI / 180;
+            try
+            {
+                var indexData = new { index = currentIndex };
+                var json = JsonSerializer.Serialize(indexData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a)); return 6371 * c; // відстань в км
+                var response = await _httpClient.PostAsync($"https://localhost:7183/api/delivery/{deliveryId}/route-index", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("💾 Збережено індекс {Index} для доставки {DeliveryId}", currentIndex, deliveryId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "❌ Помилка при збереженні індексу для доставки {DeliveryId}", deliveryId);
+            }
         }
+
+        private async Task ClearSavedRouteIndexAsync(int deliveryId)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"https://localhost:7183/api/delivery/{deliveryId}/route-index");
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("🗑️ Очищено збережений індекс для доставки {DeliveryId}", deliveryId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "❌ Помилка при очищенні індексу для доставки {DeliveryId}", deliveryId);
+            }
+        }
+    }
+
+    // Допоміжні класи для роботи з маршрутами
+    public class RouteSimulation
+    {
+        public List<RoutePoint> RoutePoints { get; set; } = new();
+        public int CurrentIndex { get; set; }
+        public DateTime StartTime { get; set; }
+    }
+
+    public class RoutePoint
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+
+    // Класи для десеріалізації OSRM відповіді
+    public class OSRMResponse
+    {
+        public OSRMRoute[] routes { get; set; }
+    }
+
+    public class OSRMRoute
+    {
+        public OSRMGeometry geometry { get; set; }
+        public double distance { get; set; }
+        public double duration { get; set; }
+    }
+
+    public class OSRMGeometry
+    {
+        public double[][] coordinates { get; set; }
     }
 }

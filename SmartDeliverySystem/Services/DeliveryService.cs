@@ -524,11 +524,11 @@ namespace SmartDeliverySystem.Services
                     Notes = h.Notes,
                     Speed = h.Speed
                 })
-                .ToListAsync();
-
-            return new DeliveryTrackingDto
+                .ToListAsync();            return new DeliveryTrackingDto
             {
                 DeliveryId = delivery.Id,
+                VendorId = delivery.VendorId, // Додаємо ID вендора
+                StoreId = delivery.StoreId, // Додаємо ID магазину
                 DriverId = delivery.DriverId ?? string.Empty,
                 GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
                 Status = delivery.Status,

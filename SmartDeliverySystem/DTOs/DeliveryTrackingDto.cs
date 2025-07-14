@@ -3,10 +3,11 @@ using System;
 using System.Collections.Generic;
 
 namespace SmartDeliverySystem.DTOs
-{
-    public class DeliveryTrackingDto
+{    public class DeliveryTrackingDto
     {
         public int DeliveryId { get; set; }
+        public int VendorId { get; set; } // Додаємо ID вендора
+        public int StoreId { get; set; } // Додаємо ID магазину
         public string DriverId { get; set; } = string.Empty;
         public string GpsTrackerId { get; set; } = string.Empty;
         public DeliveryStatus Status { get; set; }
