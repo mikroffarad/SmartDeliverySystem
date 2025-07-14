@@ -351,17 +351,20 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 }
             }
         };
-    }, [stores, onShowStoreInventory]);
-
-    // Memoize delivery keys for comparison
-    const deliveryKeys = useMemo(() => Object.keys(deliveries).sort().join(','), [deliveries]);    // Handle delivery markers with ULTRA DETAILED LOGGING
+    }, [stores, onShowStoreInventory]);    // Memoize delivery keys for comparison with coordinates
+    const deliveryKeys = useMemo(() => {
+        return Object.entries(deliveries)
+            .map(([id, delivery]) => `${id}:${delivery.currentLatitude}:${delivery.currentLongitude}`)
+            .sort()
+            .join(',');
+    }, [deliveries]);// Handle delivery markers with ULTRA DETAILED LOGGING
     useEffect(() => {
         if (!mapRef.current) {
             console.log('❌ Map not ready, skipping delivery markers update');
             return;
-        }
-
-        console.log('🚛 === DELIVERY MARKERS UPDATE ===');
+        }        console.log('🚛 === DELIVERY MARKERS UPDATE ===');
+        const updateTime = new Date().toLocaleTimeString();
+        console.log(`🚛 Update time: ${updateTime}`);
         console.log('🚛 Received deliveries:', Object.keys(deliveries));
         console.log('🚛 Current markers:', Object.keys(deliveryMarkersRef.current));
         console.log('🚛 Map instance:', mapRef.current);
@@ -373,10 +376,13 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             if (!delivery.currentLatitude || !delivery.currentLongitude) {
                 console.log(`🚛 ❌ Delivery ${deliveryId} has no coordinates`);
                 return;
+            }            // Update or create route for this delivery ONLY ONCE
+            if (!deliveryRoutesRef.current[deliveryId]) {
+                console.log(`🛣️ Creating route for delivery ${deliveryId} for the first time`);
+                updateDeliveryRoute(deliveryId, delivery);
+            } else {
+                console.log(`🛣️ Route already exists for delivery ${deliveryId}, skipping`);
             }
-
-            // Update or create route for this delivery
-            updateDeliveryRoute(deliveryId, delivery);
 
             const existingMarker = deliveryMarkersRef.current[deliveryId];
             console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS');

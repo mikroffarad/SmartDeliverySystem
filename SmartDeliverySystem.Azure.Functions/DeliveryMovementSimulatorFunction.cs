@@ -20,7 +20,8 @@ namespace SmartDeliverySystem.Azure.Functions
         }        [Function("DeliveryMovementSimulator")]
         public async Task Run([TimerTrigger("0/1 * * * * *")] TimerInfo myTimer) // Кожну секунду
         {
-            _logger.LogInformation("🚛 Запуск симуляції руху доставок...");
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            _logger.LogInformation("🚛 [{Timestamp}] Запуск симуляції руху доставок...", timestamp);
 
             try
             {
