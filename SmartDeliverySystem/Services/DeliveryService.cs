@@ -242,22 +242,31 @@ namespace SmartDeliverySystem.Services
         }
         public async Task<Delivery?> GetDeliveryAsync(int deliveryId)
         {
-            return await _context.Deliveries
+            var delivery = await _context.Deliveries
                 .Include(d => d.Vendor)
                 .Include(d => d.Store)
-                .Include(d => d.Products)
-                .ThenInclude(dp => dp.Product)
                 .FirstOrDefaultAsync(d => d.Id == deliveryId);
-        }
 
+            return delivery;
+        }
         public async Task<List<Delivery>> GetActiveDeliveriesAsync()
         {
             return await _context.Deliveries
                 .Include(d => d.Vendor)
                 .Include(d => d.Store)
-                .Where(d => d.Status != DeliveryStatus.Delivered && d.Status != DeliveryStatus.Cancelled)
+                .Where(d => d.Status == DeliveryStatus.InTransit || d.Status == DeliveryStatus.Assigned) // Включаємо Assigned
                 .ToListAsync();
         }
+
+        public async Task<List<Delivery>> GetAllDeliveriesAsync()
+        {
+            return await _context.Deliveries
+                .Include(d => d.Vendor)
+                .Include(d => d.Store)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
+        }
+
         public async Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status)
         {
             var delivery = await _context.Deliveries
@@ -563,6 +572,43 @@ namespace SmartDeliverySystem.Services
                     trackingList.Add(tracking);
             }
             return trackingList;
+        }
+        public async Task<List<object>> GetDeliveryProductsAsync(int deliveryId)
+        {
+            try
+            {
+                var delivery = await _context.Deliveries
+                    .Include(d => d.Products)
+                    .ThenInclude(dp => dp.Product)
+                    .FirstOrDefaultAsync(d => d.Id == deliveryId);
+
+                if (delivery == null)
+                {
+                    _logger.LogWarning("Delivery {DeliveryId} not found", deliveryId);
+                    return new List<object>();
+                }
+
+                if (delivery.Products == null || !delivery.Products.Any())
+                {
+                    _logger.LogWarning("No products found for delivery {DeliveryId}", deliveryId);
+                    return new List<object>();
+                }
+
+                return delivery.Products.Select(dp => new
+                {
+                    id = dp.Product.Id,
+                    name = dp.Product.Name,
+                    category = dp.Product.Category,
+                    weight = dp.Product.Weight,
+                    price = dp.Product.Price,
+                    quantity = dp.Quantity
+                }).ToList<object>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting products for delivery {DeliveryId}", deliveryId);
+                return new List<object>();
+            }
         }
     }
 }

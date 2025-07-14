@@ -50,32 +50,44 @@ namespace SmartDeliverySystem.Data
             modelBuilder.Entity<Delivery>(entity =>
             {
                 entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
                 entity.Property(e => e.TotalAmount).HasColumnType("decimal(18,2)");
 
                 entity.HasOne(d => d.Vendor)
                     .WithMany()
-                    .HasForeignKey(d => d.VendorId);
-
-                entity.HasOne(d => d.Store)
+                    .HasForeignKey(d => d.VendorId)
+                    .OnDelete(DeleteBehavior.Restrict); entity.HasOne(d => d.Store)
                     .WithMany()
-                    .HasForeignKey(d => d.StoreId);
+                    .HasForeignKey(d => d.StoreId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasMany(d => d.Products)
+                    .WithOne(dp => dp.Delivery)
+                    .HasForeignKey(dp => dp.DeliveryId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // DeliveryProduct configuration
             modelBuilder.Entity<DeliveryProduct>(entity =>
             {
                 entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+                entity.HasOne(dp => dp.Delivery)
+                    .WithMany(d => d.Products)
+                    .HasForeignKey(dp => dp.DeliveryId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(dp => dp.Product)
                     .WithMany()
                     .HasForeignKey(dp => dp.ProductId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
 
-                entity.HasOne(dp => dp.Delivery)
-                    .WithMany()
-                    .HasForeignKey(dp => dp.DeliveryId)
-                    .OnDelete(DeleteBehavior.Cascade);
-            }); modelBuilder.Entity<StoreProduct>(entity =>
+            // StoreProduct configuration
+            modelBuilder.Entity<StoreProduct>(entity =>
             {
                 entity.HasKey(e => new { e.StoreId, e.ProductId });
 

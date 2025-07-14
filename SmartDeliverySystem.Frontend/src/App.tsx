@@ -7,8 +7,11 @@ import { StoreInventoryModal } from './components/StoreInventoryModal';
 import { CreateDeliveryModal } from './components/CreateDeliveryModal';
 import { PaymentModal } from './components/PaymentModal';
 import { DriverAssignmentModal } from './components/DriverAssignmentModal';
+import { AllDeliveriesModal } from './components/AllDeliveriesModal';
+import { DeliveryProductsModal } from './components/DeliveryProductsModal';
 import { DeliveryData, ConnectionStatus, LocationData } from './types/delivery';
 import { deliveryApi } from './services/deliveryApi';
+import { getStatusText } from './utils/deliveryUtils';
 import './index.css';
 
 const App: React.FC = () => {
@@ -30,6 +33,11 @@ const App: React.FC = () => {
     const [currentDeliveryId, setCurrentDeliveryId] = useState<number | null>(null);
     const [currentTotalAmount, setCurrentTotalAmount] = useState(0); const [currentVendorName, setCurrentVendorName] = useState('');
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // All deliveries modal
+    const [showAllDeliveriesModal, setShowAllDeliveriesModal] = useState(false);
+    const [showDeliveryProductsModal, setShowDeliveryProductsModal] = useState(false);
+    const [selectedDeliveryId, setSelectedDeliveryId] = useState<number | null>(null);
 
     const connectionRef = useRef<HubConnection | null>(null);
     const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,17 +77,31 @@ const App: React.FC = () => {
             console.error("SignalR Error:", error);
             setConnectionStatus('error');
         }
-    }; const loadActiveDeliveries = async () => {
+    };    // Функція для конвертації числових статусів в текстові
+    const getStatusText = (status: number | string) => {
+        if (typeof status === 'string') return status;
+        
+        switch (status) {
+            case 0: return 'PendingPayment';
+            case 1: return 'Paid';
+            case 2: return 'Assigned';
+            case 3: return 'InTransit';
+            case 4: return 'Delivered';
+            case 5: return 'Cancelled';
+            default: return 'Unknown';
+        }
+    };
+
+    const loadActiveDeliveries = async () => {
         try {
             console.log('📦 Loading active deliveries...');
             const deliveries = await deliveryApi.getActiveDeliveries();
             console.log('📦 Received deliveries from API:', deliveries);
 
-            const deliveryMap: Record<string, DeliveryData> = {};
-
-            deliveries.forEach(delivery => {
+            const deliveryMap: Record<string, DeliveryData> = {}; deliveries.forEach(delivery => {
                 console.log(`📦 Processing delivery ${delivery.deliveryId}, status: ${delivery.status}`);
-                if (delivery.status !== 'Delivered' && delivery.status !== 'Cancelled') {
+                // Показуємо доставки зі статусом Assigned (2) і InTransit (3)
+                if (delivery.status === 2 || delivery.status === 3) {
                     deliveryMap[delivery.deliveryId.toString()] = delivery;
                     console.log(`📦 Added delivery ${delivery.deliveryId} to map`);
                 } else {
@@ -120,47 +142,42 @@ const App: React.FC = () => {
                     console.log('📍 Delivery not found in current data - trying to fetch from API...');
                     // Спробуємо додати доставку, якщо її немає
                     loadDeliveryById(data.deliveryId);
-
-                    // Також перезавантажимо всі активні доставки
-                    setTimeout(() => {
-                        console.log('📦 Reloading all active deliveries due to missing delivery...');
-                        loadActiveDeliveries();
-                    }, 100);
-
                     return prev;
                 }
             });
         }, 100); // 100ms throttle
-    };
-
-    const loadDeliveryById = async (deliveryId: number) => {
+    }; const loadDeliveryById = async (deliveryId: number) => {
         try {
             console.log(`📦 Loading delivery ${deliveryId} from API...`);
             const delivery = await deliveryApi.getDeliveryById(deliveryId);
             console.log(`📦 Received delivery ${deliveryId}:`, delivery);
 
-            if (delivery && delivery.status !== 'Delivered' && delivery.status !== 'Cancelled') {
+            // Перевіряємо чи доставка має статус Assigned (2) або InTransit (3)
+            if (delivery && (delivery.status === 2 || delivery.status === 3)) {
                 setDeliveryData(prev => ({
                     ...prev,
                     [deliveryId.toString()]: delivery
                 }));
                 console.log(`📦 Added missing delivery ${deliveryId} to state`);
+            } else {
+                console.log(`📦 Delivery ${deliveryId} has status ${delivery?.status}, not adding to active deliveries`);
             }
         } catch (error) {
             console.error(`Error loading delivery ${deliveryId}:`, error);
         }
-    };
-
-    const updateDeliveryStatus = (data: any) => {
+    }; const updateDeliveryStatus = (data: any) => {
         const deliveryId = data.deliveryId.toString();
 
-        if (data.status === 'Delivered' || data.status === 'Cancelled') {
+        if (data.status === 4 || data.status === 5 || data.status === 'Delivered' || data.status === 'Cancelled') {
+            // Видаляємо завершені доставки з активних
             setDeliveryData(prev => {
                 const newData = { ...prev };
                 delete newData[deliveryId];
+                console.log(`📦 Removed completed delivery ${deliveryId} from active deliveries`);
                 return newData;
             });
-        } else {
+        } else if (data.status === 2 || data.status === 3) {
+            // Додаємо або оновлюємо активні доставки
             setDeliveryData(prev => {
                 if (prev[deliveryId]) {
                     return {
@@ -170,8 +187,11 @@ const App: React.FC = () => {
                             status: data.status
                         }
                     };
+                } else {
+                    // Якщо доставки немає, спробуємо її завантажити
+                    loadDeliveryById(data.deliveryId);
+                    return prev;
                 }
-                return prev;
             });
         }
     }; const handleAddVendor = () => {
@@ -367,7 +387,22 @@ const App: React.FC = () => {
                 )}
             </div>            {/* Delivery info panel */}
             <div className="delivery-info">
-                <h3>📦 Active Deliveries</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h3>📦 Active Deliveries</h3>
+                    <button
+                        onClick={() => setShowAllDeliveriesModal(true)}
+                        style={{
+                            padding: '5px 10px',
+                            backgroundColor: '#17a2b8',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}
+                    >
+                        📋 All Deliveries
+                    </button>
+                </div>
                 <div className={`connection-status ${connectionStatus}`}>
                     SignalR: {connectionStatus === 'connected' ? '🟢 Connected' :
                         connectionStatus === 'disconnected' ? '🔴 Disconnected' :
@@ -378,10 +413,9 @@ const App: React.FC = () => {
                     <p>No active deliveries</p>
                 ) : (
                     <div>
-                        {Object.entries(deliveryData).map(([deliveryId, delivery]) => (
-                            <div key={deliveryId} className="delivery-item">
+                        {Object.entries(deliveryData).map(([deliveryId, delivery]) => (                            <div key={deliveryId} className="delivery-item">
                                 <h4>🚛 Delivery #{deliveryId}</h4>
-                                <p><strong>Status:</strong> {delivery.status}</p>
+                                <p><strong>Status:</strong> {getStatusText(delivery.status)}</p>
                                 <p><strong>Driver:</strong> {delivery.driverId || 'Not assigned'}</p>
                                 {delivery.currentLatitude && delivery.currentLongitude && (
                                     <p><strong>Location:</strong> {delivery.currentLatitude.toFixed(4)}, {delivery.currentLongitude.toFixed(4)}</p>
@@ -391,15 +425,35 @@ const App: React.FC = () => {
                                 )}
                                 {delivery.totalAmount && (
                                     <p><strong>Total:</strong> ${delivery.totalAmount.toFixed(2)}</p>
-                                )}                                {delivery.status === 'InTransit' && (
-                                    <button onClick={() => handleMarkAsDelivered(parseInt(deliveryId))}>
-                                        ✅ Mark as Delivered
-                                    </button>
                                 )}
+
+                                <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedDeliveryId(parseInt(deliveryId));
+                                            setShowDeliveryProductsModal(true);
+                                        }}
+                                        style={{
+                                            padding: '4px 8px',
+                                            backgroundColor: '#28a745',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '3px',
+                                            fontSize: '12px'
+                                        }}
+                                    >
+                                        📦 Products
+                                    </button>                                    {(Number(delivery.status) === 2 || Number(delivery.status) === 3) && (
+                                        <button onClick={() => handleMarkAsDelivered(parseInt(deliveryId))}>
+                                            ✅ Mark as Delivered
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
-                )}            </div><AddLocationModal
+                )}
+            </div><AddLocationModal
                 isOpen={showAddModal}
                 addingType={addingType}
                 selectedLocation={selectedLocation}
@@ -452,6 +506,23 @@ const App: React.FC = () => {
                 onClose={() => setShowDriverModal(false)}
                 onDriverAssigned={handleDriverAssigned}
                 onCancel={handleCancelDelivery}
+            />
+
+            <AllDeliveriesModal
+                isOpen={showAllDeliveriesModal}
+                onClose={() => setShowAllDeliveriesModal(false)}
+                onShowProducts={(deliveryId) => {
+                    setSelectedDeliveryId(deliveryId);
+                    setShowDeliveryProductsModal(true);
+                }}
+            />            {/* Delivery Products Modal */}
+            <DeliveryProductsModal
+                isOpen={showDeliveryProductsModal}
+                deliveryId={selectedDeliveryId}
+                onClose={() => {
+                    setShowDeliveryProductsModal(false);
+                    setSelectedDeliveryId(null);
+                }}
             />
         </div>
     );

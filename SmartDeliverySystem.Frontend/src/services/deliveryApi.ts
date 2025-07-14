@@ -26,6 +26,30 @@ class DeliveryApi {
         return response.json();
     }
 
+    async getAllDeliveries(): Promise<any[]> {
+        const response = await fetch(`${API_BASE_URL}/delivery/all`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch all deliveries');
+        }
+        return response.json();
+    }
+
+    async getDeliveryLocationHistory(deliveryId: number): Promise<any[]> {
+        const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/location-history`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch delivery location history');
+        }
+        return response.json();
+    }
+
+    async getDeliveryProducts(deliveryId: number): Promise<any[]> {
+        const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/products`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch delivery products');
+        }
+        return response.json();
+    }
+
     async createDeliveryRequest(request: DeliveryRequest): Promise<{ deliveryId: number; totalAmount: number }> {
         const response = await fetch(`${API_BASE_URL}/delivery/request-manual`, {
             method: 'POST',

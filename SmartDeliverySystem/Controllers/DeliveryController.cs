@@ -114,16 +114,51 @@ namespace SmartDeliverySystem.Controllers
                 return BadRequest(ex.Message);
             }
         }
-
         [HttpGet("{id}")]
-        public async Task<ActionResult<Delivery>> GetDelivery(int id)
+        public async Task<ActionResult<object>> GetDelivery(int id)
         {
-            var delivery = await _deliveryService.GetDeliveryAsync(id);
+            try
+            {
+                var delivery = await _deliveryService.GetDeliveryAsync(id);
 
-            if (delivery == null)
-                return NotFound();
+                if (delivery == null)
+                {
+                    return NotFound($"Delivery with ID {id} not found");
+                }                // Повертаємо простий об'єкт без циклічних залежностей
+                var result = new
+                {
+                    id = delivery.Id,
+                    deliveryId = delivery.Id, // Для сумісності з frontend
+                    vendorId = delivery.VendorId,
+                    storeId = delivery.StoreId,
+                    vendorName = delivery.Vendor?.Name,
+                    storeName = delivery.Store?.Name,
+                    totalAmount = delivery.TotalAmount,
+                    status = delivery.Status,
+                    createdAt = delivery.CreatedAt,
+                    deliveredAt = delivery.DeliveredAt,
+                    currentLatitude = delivery.CurrentLatitude,
+                    currentLongitude = delivery.CurrentLongitude,
+                    driverId = delivery.DriverId,
+                    gpsTrackerId = delivery.GpsTrackerId,
+                    fromLatitude = delivery.FromLatitude,
+                    fromLongitude = delivery.FromLongitude,
+                    toLatitude = delivery.ToLatitude,
+                    toLongitude = delivery.ToLongitude,
+                    storeLatitude = delivery.ToLatitude, // Додаємо для frontend
+                    storeLongitude = delivery.ToLongitude, // Додаємо для frontend
+                    vendorLatitude = delivery.FromLatitude, // Додаємо для frontend
+                    vendorLongitude = delivery.FromLongitude, // Додаємо для frontend
+                    lastLocationUpdate = delivery.LastLocationUpdate
+                };
 
-            return Ok(delivery);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting delivery {DeliveryId}", id);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
 
         [HttpGet("active")]
@@ -131,6 +166,42 @@ namespace SmartDeliverySystem.Controllers
         {
             var deliveries = await _deliveryService.GetActiveDeliveriesAsync();
             return Ok(deliveries);
+        }
+        [HttpGet("all")]
+        public async Task<ActionResult<List<object>>> GetAllDeliveries()
+        {
+            try
+            {
+                var deliveries = await _deliveryService.GetAllDeliveriesAsync();                // Повертаємо простий об'єкт без циклічних залежностей
+                var enrichedDeliveries = deliveries.Select(d => new
+                {
+                    id = d.Id,
+                    deliveryId = d.Id, // Для сумісності з frontend
+                    vendorId = d.VendorId,
+                    storeId = d.StoreId,
+                    vendorName = d.Vendor?.Name ?? $"Vendor #{d.VendorId}",
+                    storeName = d.Store?.Name ?? $"Store #{d.StoreId}",
+                    status = d.Status,
+                    totalAmount = d.TotalAmount,
+                    createdAt = d.CreatedAt,
+                    deliveredAt = d.DeliveredAt,
+                    currentLatitude = d.CurrentLatitude,
+                    currentLongitude = d.CurrentLongitude,
+                    driverId = d.DriverId,
+                    gpsTrackerId = d.GpsTrackerId,
+                    storeLatitude = d.ToLatitude, // Додаємо для frontend
+                    storeLongitude = d.ToLongitude, // Додаємо для frontend
+                    vendorLatitude = d.FromLatitude, // Додаємо для frontend
+                    vendorLongitude = d.FromLongitude // Додаємо для frontend
+                }).ToList();
+
+                return Ok(enrichedDeliveries);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all deliveries");
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
 
         [HttpPut("{id}/status")]
@@ -184,11 +255,26 @@ namespace SmartDeliverySystem.Controllers
                 return BadRequest(ModelState);
             }
 
+            // Перевіряємо чи доставка не завершена
+            var delivery = await _deliveryService.GetDeliveryAsync(id);
+            if (delivery == null)
+            {
+                _logger.LogWarning("❌ Доставка {DeliveryId} не знайдена", id);
+                return NotFound("Delivery not found.");
+            }
+
+            if (delivery.Status == DeliveryStatus.Delivered || delivery.Status == DeliveryStatus.Cancelled)
+            {
+                _logger.LogWarning("❌ Доставка {DeliveryId} завершена зі статусом {Status}, ігноруємо GPS оновлення",
+                    id, delivery.Status);
+                return BadRequest($"Delivery is already completed with status {delivery.Status}");
+            }
+
             var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
             if (!result)
             {
                 _logger.LogWarning("❌ Не вдалося оновити локацію для доставки {DeliveryId}", id);
-                return NotFound("Delivery not found.");
+                return NotFound("Failed to update location.");
             }
 
             _logger.LogInformation("✅ Локація успішно оновлена для доставки {DeliveryId}", id);
@@ -223,7 +309,6 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogError(ex, "Failed to send SignalR update");
             }
 
-            _logger.LogInformation("Location updated for delivery {DeliveryId}", id);
             return Ok();
         }
 
@@ -273,6 +358,21 @@ namespace SmartDeliverySystem.Controllers
             {
                 _logger.LogError(ex, "Error getting location history for delivery {DeliveryId}", deliveryId);
                 return BadRequest($"Error getting location history: {ex.Message}");
+            }
+        }
+
+        [HttpGet("{deliveryId}/products")]
+        public async Task<ActionResult<List<object>>> GetDeliveryProducts(int deliveryId)
+        {
+            try
+            {
+                var products = await _deliveryService.GetDeliveryProductsAsync(deliveryId);
+                return Ok(products);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting products for delivery {DeliveryId}", deliveryId);
+                return BadRequest($"Error getting delivery products: {ex.Message}");
             }
         }
 

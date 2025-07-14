@@ -3,6 +3,7 @@ using SmartDeliverySystem.Services;
 using SmartDeliverySystem.Data;
 using SmartDeliverySystem.Middleware;
 using Azure.Messaging.ServiceBus;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,14 +11,25 @@ var builder = WebApplication.CreateBuilder(args);
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddAutoMapper(typeof(SmartDeliverySystem.Mappings.MappingProfile));
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 
 // Database
 builder.Services.AddDbContext<DeliveryContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Configure JSON serialization to ignore cycles
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 
 // Services
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();

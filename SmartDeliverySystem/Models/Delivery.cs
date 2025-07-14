@@ -1,4 +1,7 @@
-﻿namespace SmartDeliverySystem.Models
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace SmartDeliverySystem.Models
 {
     public enum DeliveryStatus
     {
@@ -12,51 +15,41 @@
 
     public class Delivery
     {
+        [Key]
         public int Id { get; set; }
 
+        [ForeignKey("Vendor")]
         public int VendorId { get; set; }
-        public Vendor? Vendor { get; set; }
 
+        [ForeignKey("Store")]
         public int StoreId { get; set; }
-        public Store? Store { get; set; }
-
-        public List<DeliveryProduct> Products { get; set; } = new();
-
-        public DeliveryStatus Status { get; set; } = DeliveryStatus.PendingPayment;
-
-        public string? DriverId { get; set; }
-
-        public string? GpsTrackerId { get; set; }
 
         public decimal TotalAmount { get; set; }
-
+        public DeliveryStatus Status { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
+        public DateTime? PaymentDate { get; set; }
+        public string? PaymentMethod { get; set; }
+        public decimal? PaidAmount { get; set; }
         public DateTime? AssignedAt { get; set; }
+        public string? DriverId { get; set; }
+        public string? GpsTrackerId { get; set; }
 
-        public DateTime? DeliveredAt { get; set; }
-        public DateTime PaymentDate { get; internal set; }
-        public string? PaymentMethod { get; internal set; }
-        public decimal PaidAmount { get; internal set; }
+        // Location coordinates
         public double? FromLatitude { get; set; }
         public double? FromLongitude { get; set; }
         public double? ToLatitude { get; set; }
         public double? ToLongitude { get; set; }
-
-        // GPS Tracking properties
         public double? CurrentLatitude { get; set; }
         public double? CurrentLongitude { get; set; }
         public DateTime? LastLocationUpdate { get; set; }
+        public DateTime? DeliveredAt { get; set; }
         public string? TrackingNotes { get; set; }
-    }
-    public class DeliveryProduct
-    {
-        public int Id { get; set; }
-        public int DeliveryId { get; set; }
-        public Delivery? Delivery { get; set; }
-        public int ProductId { get; set; }
-        public Product? Product { get; set; }
-        public int Quantity { get; set; }
+
+        // Navigation properties
+        public virtual Vendor Vendor { get; set; } = null!;
+        public virtual Store Store { get; set; } = null!;
+        public virtual ICollection<DeliveryProduct> Products { get; set; } = new List<DeliveryProduct>();
+        public virtual ICollection<DeliveryLocationHistory> LocationHistory { get; set; } = new List<DeliveryLocationHistory>();
     }
 
     // New GPS tracking model

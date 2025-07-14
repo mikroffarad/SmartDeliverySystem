@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { deliveryApi } from '../services/deliveryApi';
 import { VendorData, StoreData, DeliveryData } from '../types/delivery';
+import { getStatusText } from '../utils/deliveryUtils';
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -413,10 +414,33 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             status: delivery.status,
                             lastUpdate: delivery.lastLocationUpdate
                         });                    // СПРОЩЕНА УМОВА: якщо вантажівка на місці призначення - показуємо прибуття
-                    if (isAtDestination) {
-                        console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);                        // Mark delivery as arrived to prevent recreation
+                    if (isAtDestination && !arrivedDeliveriesRef.current.has(deliveryId)) {
+                        console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);
+
+                        // Mark delivery as arrived to prevent recreation
                         arrivedDeliveriesRef.current.add(deliveryId);
                         console.log(`🏁 Marked delivery ${deliveryId} as arrived`);
+
+                        // Автоматично оновлюємо статус доставки на "Delivered"
+                        try {
+                            console.log(`🔄 Updating delivery ${deliveryId} status to Delivered`);
+                            // Викликаємо API для оновлення статусу
+                            fetch(`https://localhost:7183/api/delivery/${deliveryId}/status`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(4) // 4 = Delivered
+                            }).then(response => {
+                                if (response.ok) {
+                                    console.log(`✅ Successfully updated delivery ${deliveryId} to Delivered`);
+                                } else {
+                                    console.error(`❌ Failed to update delivery ${deliveryId} status`);
+                                }
+                            });
+                        } catch (error) {
+                            console.error(`❌ Error updating delivery ${deliveryId} status:`, error);
+                        }
 
                         // Show arrival notification and keep truck visible for a short time
                         existingMarker.getPopup()?.setContent(`
@@ -424,10 +448,13 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                                 <b>🚛 Delivery #${deliveryId}</b><br>
                                 Driver: ${delivery.driverId || 'Not assigned'}<br>
                                 <strong style="color: green;">🎯 ARRIVED AT DESTINATION!</strong><br>
+                                <strong style="color: green;">📦 Marking as Delivered...</strong><br>
                                 Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                                 Updated: ${updateTime}
                             </div>
-                        `);                        // Auto-open popup to show arrival
+                        `);
+
+                        // Auto-open popup to show arrival
                         existingMarker.openPopup();
 
                         // Notify parent component about arrival
@@ -495,18 +522,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     console.log(`🚛 ✅ Successfully updated position for delivery ${deliveryId}`);
                 } catch (error) {
                     console.error(`🚛 ❌ Error updating position for delivery ${deliveryId}:`, error);
-                }
-
-                // Update popup with current time
+                }                // Update popup with current time
                 try {
                     existingMarker.getPopup()?.setContent(`
                         <div>
                             <b>🚛 Delivery #${deliveryId}</b><br>
                             Driver: ${delivery.driverId || 'Not assigned'}<br>
-                            Status: ${delivery.status}<br>
+                            Status: ${getStatusText(delivery.status)}<br>
                             Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                             Updated: ${updateTime}<br>
-                            ${delivery.status === 'InTransit' ?
+                            ${(delivery.status === 2 || delivery.status === 3) ?
                             `<button onclick="window.markAsDelivered(${deliveryId})"
                                         style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-top: 5px; border-radius: 3px; display: block; width: 100%;">
                                     ✅ Mark as Delivered
@@ -530,16 +555,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     console.log(`🚛 Created marker instance:`, marker);
 
                     marker.addTo(mapRef.current!);
-                    console.log(`🚛 Added marker to map`);
-
-                    marker.bindPopup(`
+                    console.log(`🚛 Added marker to map`);                    marker.bindPopup(`
                         <div>
                             <b>🚛 Delivery #${deliveryId}</b><br>
                             Driver: ${delivery.driverId || 'Not assigned'}<br>
-                            Status: ${delivery.status}<br>
+                            Status: ${getStatusText(delivery.status)}<br>
                             Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                             Created: ${new Date().toLocaleTimeString()}<br>
-                            ${delivery.status === 'InTransit' ?
+                            ${(delivery.status === 2 || delivery.status === 3) ?
                             `<button onclick="window.markAsDelivered(${deliveryId})"
                                         style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-top: 5px; border-radius: 3px; display: block; width: 100%;">
                                     ✅ Mark as Delivered
