@@ -20,6 +20,14 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
     const [gpsTrackerId, setGpsTrackerId] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Auto-fill driver and GPS tracker IDs when deliveryId changes
+    React.useEffect(() => {
+        if (deliveryId) {
+            setDriverId(`DRIVER_${deliveryId}`);
+            setGpsTrackerId(`GPS_${deliveryId}`);
+        }
+    }, [deliveryId]);
+
     const handleAssignDriver = async () => {
         if (!deliveryId || !driverId || !gpsTrackerId) {
             alert('Please fill all driver fields');
@@ -104,9 +112,7 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                     }}>
                         🚛 Active
                     </div>
-                </div>
-
-                <div style={{
+                </div>                <div style={{
                     backgroundColor: '#f8f9fa',
                     padding: '20px',
                     borderRadius: '8px',
@@ -114,16 +120,33 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                 }}>
                     <p><strong>Delivery ID:</strong> {deliveryId}</p>
                     <p><strong>Status:</strong> Paid ✅</p>
-
-                    <div className="form-group">
+                    
+                    <div style={{
+                        backgroundColor: '#e9f7ef',
+                        border: '1px solid #c3e6cb',
+                        borderRadius: '5px',
+                        padding: '10px',
+                        marginBottom: '15px',
+                        fontSize: '14px'
+                    }}>
+                        <strong>ℹ️ Note:</strong> Driver and GPS Tracker IDs are automatically generated based on the delivery ID.
+                    </div><div className="form-group">
                         <label htmlFor="driverId">Driver ID:</label>
                         <input
                             type="text"
                             id="driverId"
                             value={driverId}
-                            onChange={(e) => setDriverId(e.target.value)}
-                            placeholder="Enter driver ID"
-                            style={{ width: '100%', padding: '10px', margin: '8px 0', borderRadius: '5px', border: '1px solid #ddd' }}
+                            readOnly
+                            placeholder="Auto-generated based on delivery ID"
+                            style={{ 
+                                width: '100%', 
+                                padding: '10px', 
+                                margin: '8px 0', 
+                                borderRadius: '5px', 
+                                border: '1px solid #ddd',
+                                backgroundColor: '#f8f9fa',
+                                color: '#495057'
+                            }}
                         />
                     </div>
 
@@ -133,9 +156,17 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                             type="text"
                             id="gpsTrackerId"
                             value={gpsTrackerId}
-                            onChange={(e) => setGpsTrackerId(e.target.value)}
-                            placeholder="Enter GPS tracker ID"
-                            style={{ width: '100%', padding: '10px', margin: '8px 0', borderRadius: '5px', border: '1px solid #ddd' }}
+                            readOnly
+                            placeholder="Auto-generated based on delivery ID"
+                            style={{ 
+                                width: '100%', 
+                                padding: '10px', 
+                                margin: '8px 0', 
+                                borderRadius: '5px', 
+                                border: '1px solid #ddd',
+                                backgroundColor: '#f8f9fa',
+                                color: '#495057'
+                            }}
                         />
                     </div>
 

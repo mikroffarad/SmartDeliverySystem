@@ -270,7 +270,7 @@ const App: React.FC = () => {
             console.error('Error cancelling delivery:', error);
             alert('Error cancelling delivery. Please try again.');
         }
-    };    const handleMarkAsDelivered = async (deliveryId: number) => {
+    }; const handleMarkAsDelivered = async (deliveryId: number) => {
         if (!confirm(`Mark delivery #${deliveryId} as delivered? This will add products to store inventory.`)) {
             return;
         }
@@ -283,7 +283,7 @@ const App: React.FC = () => {
             console.error('Error marking delivery as delivered:', error);
             alert('Error marking delivery as delivered. Please try again.');
         }
-    };    const handleDeliveryArrived = (deliveryId: string) => {
+    }; const handleDeliveryArrived = (deliveryId: string) => {
         console.log(`🎯 Delivery ${deliveryId} arrived - removing from state`);
         setDeliveryData(prev => {
             const updated = { ...prev };

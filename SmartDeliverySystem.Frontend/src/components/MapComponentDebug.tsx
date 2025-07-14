@@ -417,7 +417,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);                        // Mark delivery as arrived to prevent recreation
                         arrivedDeliveriesRef.current.add(deliveryId);
                         console.log(`🏁 Marked delivery ${deliveryId} as arrived`);
-                        
+
                         // Show arrival notification and keep truck visible for a short time
                         existingMarker.getPopup()?.setContent(`
                             <div>
@@ -429,12 +429,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             </div>
                         `);                        // Auto-open popup to show arrival
                         existingMarker.openPopup();
-                        
+
                         // Notify parent component about arrival
                         if (onDeliveryArrived) {
                             onDeliveryArrived(deliveryId);
                         }
-                        
+
                         // Remove delivery from parent state immediately to update UI
                         const currentDeliveries = deliveries;
                         const updatedDeliveries = { ...currentDeliveries };
