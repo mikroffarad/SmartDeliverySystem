@@ -477,6 +477,39 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteDelivery(int id)
+        {
+            try
+            {
+                var delivery = await _deliveryService.GetDeliveryAsync(id);
+                if (delivery == null)
+                {
+                    return NotFound($"Delivery with ID {id} not found");
+                }
+
+                // Check if delivery is in progress
+                if (delivery.Status == DeliveryStatus.InTransit)
+                {
+                    return BadRequest("Cannot delete delivery that is currently in transit");
+                }
+
+                var deleted = await _deliveryService.DeleteDeliveryAsync(id);
+                if (!deleted)
+                {
+                    return BadRequest("Failed to delete delivery");
+                }
+
+                _logger.LogInformation("🗑️ Delivery {DeliveryId} deleted successfully", id);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error deleting delivery {DeliveryId}", id);
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
         // Статичний кеш для збереження індексів маршрутів
         private static readonly Dictionary<int, int> RouteIndexCache = new();
 

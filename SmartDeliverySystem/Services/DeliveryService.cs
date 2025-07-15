@@ -381,6 +381,54 @@ namespace SmartDeliverySystem.Services
                     deliveryProduct.ProductId, deliveryProduct.Quantity);
             }
         }
+
+        private async Task RemoveProductsFromStoreInventoryAsync(Delivery delivery)
+        {
+            _logger.LogInformation("Removing products from store inventory for delivery {DeliveryId}", delivery.Id);
+
+            // Get delivery products from database if not loaded
+            if (delivery.Products == null || !delivery.Products.Any())
+            {
+                delivery.Products = await _context.DeliveryProducts
+                    .Include(dp => dp.Product)
+                    .Where(dp => dp.DeliveryId == delivery.Id)
+                    .ToListAsync();
+            }
+
+            foreach (var deliveryProduct in delivery.Products)
+            {
+                var storeProduct = await _context.StoreProducts
+                    .FirstOrDefaultAsync(sp => sp.StoreId == delivery.StoreId && sp.ProductId == deliveryProduct.ProductId);
+
+                if (storeProduct != null)
+                {
+                    // Decrease quantity
+                    storeProduct.Quantity -= deliveryProduct.Quantity;
+
+                    // If quantity becomes 0 or negative, remove the record
+                    if (storeProduct.Quantity <= 0)
+                    {
+                        _context.StoreProducts.Remove(storeProduct);
+                        _logger.LogInformation("Removed product {ProductId} from store {StoreId} inventory (quantity was {Quantity})",
+                            deliveryProduct.ProductId, delivery.StoreId, storeProduct.Quantity + deliveryProduct.Quantity);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Decreased product {ProductId} quantity in store {StoreId} by {Quantity}",
+                            deliveryProduct.ProductId, delivery.StoreId, deliveryProduct.Quantity);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Product {ProductId} not found in store {StoreId} inventory when trying to remove",
+                        deliveryProduct.ProductId, delivery.StoreId);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Successfully removed products from store inventory for delivery {DeliveryId}", delivery.Id);
+        }
+
         public async Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment)
         {
             var delivery = await _context.Deliveries.FindAsync(deliveryId);
@@ -608,6 +656,49 @@ namespace SmartDeliverySystem.Services
             {
                 _logger.LogError(ex, "Error getting products for delivery {DeliveryId}", deliveryId);
                 return new List<object>();
+            }
+        }
+        public async Task<bool> DeleteDeliveryAsync(int deliveryId)
+        {
+            try
+            {
+                var delivery = await _context.Deliveries
+                    .Include(d => d.Products)
+                    .Include(d => d.LocationHistory)
+                    .FirstOrDefaultAsync(d => d.Id == deliveryId);
+
+                if (delivery == null)
+                {
+                    _logger.LogWarning("Delivery {DeliveryId} not found for deletion", deliveryId);
+                    return false;
+                }
+
+                // Check if delivery is in transit - don't allow deletion
+                if (delivery.Status == DeliveryStatus.InTransit)
+                {
+                    _logger.LogWarning("Cannot delete delivery {DeliveryId} that is in transit", deliveryId);
+                    return false;
+                }
+
+                _logger.LogInformation("Deleting delivery {DeliveryId} with status {Status}", deliveryId, delivery.Status);
+
+                // If delivery was completed, remove products from store inventory
+                if (delivery.Status == DeliveryStatus.Delivered)
+                {
+                    await RemoveProductsFromStoreInventoryAsync(delivery);
+                }
+
+                // Remove from context - EF will handle cascade deletion for related entities
+                _context.Deliveries.Remove(delivery);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Successfully deleted delivery {DeliveryId}", deliveryId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting delivery {DeliveryId}", deliveryId);
+                return false;
             }
         }
     }

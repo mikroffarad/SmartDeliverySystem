@@ -1,7 +1,7 @@
 // Утиліта для конвертації статусів доставки
 export const getStatusText = (status: number | string): string => {
     if (typeof status === 'string') return status;
-    
+
     switch (status) {
         case 0: return 'PendingPayment';
         case 1: return 'Paid';
@@ -16,7 +16,7 @@ export const getStatusText = (status: number | string): string => {
 // Утиліта для отримання кольору статусу
 export const getStatusColor = (status: number | string): string => {
     const statusText = getStatusText(status);
-    
+
     switch (statusText) {
         case 'PendingPayment': return '#ffc107';
         case 'Paid': return '#17a2b8';

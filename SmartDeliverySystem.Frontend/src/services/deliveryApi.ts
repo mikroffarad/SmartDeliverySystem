@@ -48,50 +48,57 @@ class DeliveryApi {
             throw new Error('Failed to fetch delivery products');
         }
         return response.json();
-    }
-
-    async createDeliveryRequest(request: DeliveryRequest): Promise<{ deliveryId: number; totalAmount: number }> {
+    } async createDeliveryRequest(request: DeliveryRequest): Promise<{ deliveryId: number; totalAmount: number }> {
         const response = await fetch(`${API_BASE_URL}/delivery/request-manual`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request)
         });
-        if (!response.ok) throw new Error('Failed to create delivery request');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create delivery request');
+        }
         return response.json();
-    }
-
-    async processPayment(deliveryId: number, paymentData: PaymentData): Promise<void> {
+    } async processPayment(deliveryId: number, paymentData: PaymentData): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/pay`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(paymentData)
         });
-        if (!response.ok) throw new Error('Failed to process payment');
-    }
-
-    async assignDriver(deliveryId: number, driverData: DriverData): Promise<void> {
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to process payment');
+        }
+    } async assignDriver(deliveryId: number, driverData: DriverData): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/assign-driver`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(driverData)
         });
-        if (!response.ok) throw new Error('Failed to assign driver');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to assign driver');
+        }
     } async updateDeliveryStatus(deliveryId: number, status: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(status)
         });
-        if (!response.ok) throw new Error('Failed to update delivery status');
-    }
-
-    async cancelDelivery(deliveryId: number): Promise<void> {
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update delivery status');
+        }
+    } async cancelDelivery(deliveryId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(5) // 5 = Cancelled enum value
         });
-        if (!response.ok) throw new Error('Failed to cancel delivery');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to cancel delivery');
+        }
     }
 
     // Vendor endpoints
@@ -99,23 +106,25 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/vendors/map`);
         if (!response.ok) throw new Error('Failed to fetch vendors');
         return response.json();
-    }
-
-    async createVendor(vendorData: LocationData): Promise<VendorData> {
+    } async createVendor(vendorData: LocationData): Promise<VendorData> {
         const response = await fetch(`${API_BASE_URL}/vendors`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(vendorData)
         });
-        if (!response.ok) throw new Error('Failed to create vendor');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create vendor');
+        }
         return response.json();
-    }
-
-    async deleteVendor(vendorId: number): Promise<void> {
+    } async deleteVendor(vendorId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/vendors/${vendorId}`, {
             method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Failed to delete vendor');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to delete vendor');
+        }
     }
 
     // Store endpoints
@@ -123,23 +132,25 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/stores/map`);
         if (!response.ok) throw new Error('Failed to fetch stores');
         return response.json();
-    }
-
-    async createStore(storeData: LocationData): Promise<StoreData> {
+    } async createStore(storeData: LocationData): Promise<StoreData> {
         const response = await fetch(`${API_BASE_URL}/stores`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(storeData)
         });
-        if (!response.ok) throw new Error('Failed to create store');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create store');
+        }
         return response.json();
-    }
-
-    async deleteStore(storeId: number): Promise<void> {
+    } async deleteStore(storeId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/stores/${storeId}`, {
             method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Failed to delete store');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to delete store');
+        }
     }
 
     async getStoreInventory(storeId: number): Promise<InventoryItem[]> {
@@ -156,7 +167,10 @@ class DeliveryApi {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ vendorId, products })
         });
-        if (!response.ok) throw new Error('Failed to find best store');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to find best store');
+        }
         return response.json();
     }
 
@@ -171,7 +185,10 @@ class DeliveryApi {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(product)
         });
-        if (!response.ok) throw new Error('Failed to add product');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to add product');
+        }
         return response.json();
     } async updateProduct(productId: number, product: Omit<ProductData, 'id'> & { vendorId: number }): Promise<ProductData> {
         const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
@@ -179,7 +196,10 @@ class DeliveryApi {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(product)
         });
-        if (!response.ok) throw new Error('Failed to update product');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update product');
+        }
 
         // Якщо відповідь порожня (204 No Content), повертаємо оновлений продукт
         if (response.status === 204 || response.headers.get('content-length') === '0') {
@@ -193,13 +213,28 @@ class DeliveryApi {
         }
 
         return JSON.parse(text);
-    }
-
-    async deleteProduct(productId: number): Promise<void> {
+    } async deleteProduct(productId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
             method: 'DELETE'
         });
-        if (!response.ok) throw new Error('Failed to delete product');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to delete product');
+        }
+    }
+
+    async deleteDelivery(deliveryId: number): Promise<void> {
+        const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error || 'Failed to delete delivery');
+        }
     }
 }
 

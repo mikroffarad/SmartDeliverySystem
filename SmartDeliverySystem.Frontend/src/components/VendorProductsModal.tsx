@@ -208,7 +208,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
             loadVendorProducts(); // Refresh list
         } catch (error) {
             console.error('Error deleting product:', error);
-            alert('Error deleting product. Please try again.');
+            alert(error);
         }
     }; const handleCancelEdit = () => {
         setShowAddProduct(false);

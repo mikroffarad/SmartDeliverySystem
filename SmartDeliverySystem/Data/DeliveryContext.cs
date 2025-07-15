@@ -21,8 +21,7 @@ namespace SmartDeliverySystem.Data
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            // Product configuration
+        {            // Product configuration
             modelBuilder.Entity<Product>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -30,6 +29,11 @@ namespace SmartDeliverySystem.Data
                 entity.Property(e => e.Category).HasMaxLength(100);
                 entity.Property(e => e.Price).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Weight).HasColumnType("decimal(18,2)");
+
+                entity.HasOne(p => p.Vendor)
+                    .WithMany(v => v.Products)
+                    .HasForeignKey(p => p.VendorId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Store configuration
@@ -44,9 +48,7 @@ namespace SmartDeliverySystem.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200);
-            });
-
-            // Delivery configuration
+            });            // Delivery configuration
             modelBuilder.Entity<Delivery>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -58,7 +60,9 @@ namespace SmartDeliverySystem.Data
                 entity.HasOne(d => d.Vendor)
                     .WithMany()
                     .HasForeignKey(d => d.VendorId)
-                    .OnDelete(DeleteBehavior.Restrict); entity.HasOne(d => d.Store)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(d => d.Store)
                     .WithMany()
                     .HasForeignKey(d => d.StoreId)
                     .OnDelete(DeleteBehavior.Restrict);
@@ -78,9 +82,7 @@ namespace SmartDeliverySystem.Data
                 entity.HasOne(dp => dp.Delivery)
                     .WithMany(d => d.Products)
                     .HasForeignKey(dp => dp.DeliveryId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(dp => dp.Product)
+                    .OnDelete(DeleteBehavior.Cascade); entity.HasOne(dp => dp.Product)
                     .WithMany()
                     .HasForeignKey(dp => dp.ProductId)
                     .OnDelete(DeleteBehavior.Restrict);
@@ -94,12 +96,10 @@ namespace SmartDeliverySystem.Data
                 entity.HasOne(sp => sp.Store)
                     .WithMany()
                     .HasForeignKey(sp => sp.StoreId)
-                    .OnDelete(DeleteBehavior.Cascade);
-
-                entity.HasOne(sp => sp.Product)
+                    .OnDelete(DeleteBehavior.Cascade); entity.HasOne(sp => sp.Product)
                     .WithMany()
                     .HasForeignKey(sp => sp.ProductId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 entity.Property(sp => sp.Quantity).IsRequired();
             });

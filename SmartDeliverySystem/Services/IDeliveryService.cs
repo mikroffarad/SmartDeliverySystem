@@ -16,9 +16,9 @@ namespace SmartDeliverySystem.Services
         Task<List<object>> GetDeliveryProductsAsync(int deliveryId); // Новий метод для продуктів
         Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status);
         Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment);
-        Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto);
-        Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
+        Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto); Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
         Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int deliveryId);
         Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync();
+        Task<bool> DeleteDeliveryAsync(int deliveryId);
     }
 }

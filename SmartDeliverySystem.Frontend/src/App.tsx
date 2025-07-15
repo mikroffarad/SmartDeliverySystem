@@ -80,7 +80,7 @@ const App: React.FC = () => {
     };    // Функція для конвертації числових статусів в текстові
     const getStatusText = (status: number | string) => {
         if (typeof status === 'string') return status;
-        
+
         switch (status) {
             case 0: return 'PendingPayment';
             case 1: return 'Paid';
@@ -413,43 +413,43 @@ const App: React.FC = () => {
                     <p>No active deliveries</p>
                 ) : (
                     <div>
-                        {Object.entries(deliveryData).map(([deliveryId, delivery]) => (                            <div key={deliveryId} className="delivery-item">
-                                <h4>🚛 Delivery #{deliveryId}</h4>
-                                <p><strong>Status:</strong> {getStatusText(delivery.status)}</p>
-                                <p><strong>Driver:</strong> {delivery.driverId || 'Not assigned'}</p>
-                                {delivery.currentLatitude && delivery.currentLongitude && (
-                                    <p><strong>Location:</strong> {delivery.currentLatitude.toFixed(4)}, {delivery.currentLongitude.toFixed(4)}</p>
-                                )}
-                                {delivery.lastLocationUpdate && (
-                                    <p><strong>Last Update:</strong> {new Date(delivery.lastLocationUpdate).toLocaleTimeString()}</p>
-                                )}
-                                {delivery.totalAmount && (
-                                    <p><strong>Total:</strong> ${delivery.totalAmount.toFixed(2)}</p>
-                                )}
+                        {Object.entries(deliveryData).map(([deliveryId, delivery]) => (<div key={deliveryId} className="delivery-item">
+                            <h4>🚛 Delivery #{deliveryId}</h4>
+                            <p><strong>Status:</strong> {getStatusText(delivery.status)}</p>
+                            <p><strong>Driver:</strong> {delivery.driverId || 'Not assigned'}</p>
+                            {delivery.currentLatitude && delivery.currentLongitude && (
+                                <p><strong>Location:</strong> {delivery.currentLatitude.toFixed(4)}, {delivery.currentLongitude.toFixed(4)}</p>
+                            )}
+                            {delivery.lastLocationUpdate && (
+                                <p><strong>Last Update:</strong> {new Date(delivery.lastLocationUpdate).toLocaleTimeString()}</p>
+                            )}
+                            {delivery.totalAmount && (
+                                <p><strong>Total:</strong> ${delivery.totalAmount.toFixed(2)}</p>
+                            )}
 
-                                <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedDeliveryId(parseInt(deliveryId));
-                                            setShowDeliveryProductsModal(true);
-                                        }}
-                                        style={{
-                                            padding: '4px 8px',
-                                            backgroundColor: '#28a745',
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '3px',
-                                            fontSize: '12px'
-                                        }}
-                                    >
-                                        📦 Products
-                                    </button>                                    {(Number(delivery.status) === 2 || Number(delivery.status) === 3) && (
-                                        <button onClick={() => handleMarkAsDelivered(parseInt(deliveryId))}>
-                                            ✅ Mark as Delivered
-                                        </button>
-                                    )}
-                                </div>
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                                <button
+                                    onClick={() => {
+                                        setSelectedDeliveryId(parseInt(deliveryId));
+                                        setShowDeliveryProductsModal(true);
+                                    }}
+                                    style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: '#28a745',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '3px',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    📦 Products
+                                </button>                                    {(Number(delivery.status) === 2 || Number(delivery.status) === 3) && (
+                                    <button onClick={() => handleMarkAsDelivered(parseInt(deliveryId))}>
+                                        ✅ Mark as Delivered
+                                    </button>
+                                )}
                             </div>
+                        </div>
                         ))}
                     </div>
                 )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DeliveryData } from '../types/delivery';
 import { deliveryApi } from '../services/deliveryApi';
+import { showErrorAlert, showSuccessAlert } from '../utils/errorHandler';
 
 interface AllDeliveriesModalProps {
     isOpen: boolean;
@@ -72,9 +73,7 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleShowGPSHistory = async (deliveryId: number) => {
+    }; const handleShowGPSHistory = async (deliveryId: number) => {
         setLoading(true);
         try {
             const history = await deliveryApi.getDeliveryLocationHistory(deliveryId);
@@ -83,7 +82,23 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
             setShowGPSHistory(true);
         } catch (error) {
             console.error('Error loading GPS history:', error);
-            alert('Error loading GPS history');
+            showErrorAlert(error, 'Error loading GPS history');
+        } finally {
+            setLoading(false);
+        }
+    }; const handleDeleteDelivery = async (deliveryId: number) => {
+        if (!window.confirm('Are you sure you want to delete this delivery?')) {
+            return;
+        }
+
+        setLoading(true); try {
+            await deliveryApi.deleteDelivery(deliveryId);
+            showSuccessAlert('Delivery deleted successfully');
+            // Reload deliveries after deletion
+            await loadAllDeliveries();
+        } catch (error) {
+            console.error('Error deleting delivery:', error);
+            showErrorAlert(error, 'Error deleting delivery');
         } finally {
             setLoading(false);
         }
@@ -144,8 +159,7 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                         </span>
                                     </td>
                                     <td style={{ padding: '10px', border: '1px solid #ddd' }}>${delivery.totalAmount.toFixed(2)}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.createdAt}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.createdAt}</td>                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
                                         <div style={{ display: 'flex', gap: '5px' }}>
                                             <button
                                                 onClick={() => handleShowGPSHistory(delivery.deliveryId)}
@@ -172,6 +186,20 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                                 }}
                                             >
                                                 📦 Products
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteDelivery(delivery.deliveryId)}
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    backgroundColor: '#dc3545',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    fontSize: '11px'
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                ❌ Delete
                                             </button>
                                         </div>
                                     </td>

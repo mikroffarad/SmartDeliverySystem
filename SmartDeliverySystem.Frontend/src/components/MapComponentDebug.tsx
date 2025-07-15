@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { deliveryApi } from '../services/deliveryApi';
 import { VendorData, StoreData, DeliveryData } from '../types/delivery';
 import { getStatusText } from '../utils/deliveryUtils';
+import { showErrorAlert, showSuccessAlert } from '../utils/errorHandler';
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -289,14 +290,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         };
         (window as any).createDelivery = (vendorId: number) => {
             if (onCreateDelivery) onCreateDelivery(vendorId);
-        };
-        (window as any).deleteVendor = async (vendorId: number) => {
+        }; (window as any).deleteVendor = async (vendorId: number) => {
             if (confirm('Are you sure you want to delete this vendor?')) {
                 try {
                     await deliveryApi.deleteVendor(vendorId);
                     loadVendorsAndStores();
                 } catch (error) {
-                    alert('Error deleting vendor');
+                    console.error('Error deleting vendor:', error);
+                    showErrorAlert(error, 'Error deleting vendor');
                 }
             }
         };
@@ -344,14 +345,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
         (window as any).showStoreInventory = (storeId: number, storeName?: string) => {
             if (onShowStoreInventory) onShowStoreInventory(storeId, storeName);
-        };
-        (window as any).deleteStore = async (storeId: number) => {
+        }; (window as any).deleteStore = async (storeId: number) => {
             if (confirm('Are you sure you want to delete this store?')) {
                 try {
                     await deliveryApi.deleteStore(storeId);
                     loadVendorsAndStores();
                 } catch (error) {
-                    alert('Error deleting store');
+                    console.error('Error deleting store:', error);
+                    showErrorAlert(error, 'Error deleting store');
                 }
             }
         };
@@ -555,7 +556,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     console.log(`🚛 Created marker instance:`, marker);
 
                     marker.addTo(mapRef.current!);
-                    console.log(`🚛 Added marker to map`);                    marker.bindPopup(`
+                    console.log(`🚛 Added marker to map`); marker.bindPopup(`
                         <div>
                             <b>🚛 Delivery #${deliveryId}</b><br>
                             Driver: ${delivery.driverId || 'Not assigned'}<br>

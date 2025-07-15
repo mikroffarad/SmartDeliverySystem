@@ -82,9 +82,68 @@ namespace SmartDeliverySystem.Controllers
         {
             var store = await _context.Stores.FindAsync(id);
             if (store == null) return NotFound();
+
+            // Check if there are any deliveries for this store
+            var hasDeliveries = await _context.Deliveries.AnyAsync(d => d.StoreId == id);
+            if (hasDeliveries)
+            {
+                return BadRequest("Cannot delete store because it has associated deliveries. Please delete all deliveries first.");
+            }
+
+            // Check if there are any store products in inventory
+            var storeProductsCount = await _context.StoreProducts
+                .Where(sp => sp.StoreId == id)
+                .CountAsync();
+
+            if (storeProductsCount > 0)
+            {
+                return BadRequest($"Cannot delete store because it has {storeProductsCount} products in inventory. Please remove all products from store inventory first or delete all related deliveries.");
+            }
+
             _context.Stores.Remove(store);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpDelete("{id}/inventory")]
+        public async Task<IActionResult> ClearStoreInventory(int id)
+        {
+            var store = await _context.Stores.FindAsync(id);
+            if (store == null) return NotFound();
+
+            var storeProducts = await _context.StoreProducts
+                .Where(sp => sp.StoreId == id)
+                .ToListAsync();
+
+            if (storeProducts.Any())
+            {
+                _context.StoreProducts.RemoveRange(storeProducts);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { message = $"Cleared inventory for store {store.Name}", productsRemoved = storeProducts.Count });
+        }
+
+        [HttpGet("{id}/inventory")]
+        public async Task<ActionResult<IEnumerable<object>>> GetStoreInventory(int id)
+        {
+            var store = await _context.Stores.FindAsync(id);
+            if (store == null) return NotFound();
+
+            var inventory = await _context.StoreProducts
+                .Where(sp => sp.StoreId == id)
+                .Include(sp => sp.Product)
+                .Select(sp => new
+                {
+                    productId = sp.ProductId,
+                    productName = sp.Product.Name,
+                    category = sp.Product.Category,
+                    quantity = sp.Quantity,
+                    price = sp.Product.Price
+                })
+                .ToListAsync();
+
+            return Ok(inventory);
         }
     }
 }

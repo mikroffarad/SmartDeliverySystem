@@ -93,6 +93,21 @@ namespace SmartDeliverySystem.Controllers
         {
             var vendor = await _context.Vendors.FindAsync(id);
             if (vendor == null) return NotFound();
+
+            // Check if there are any deliveries for this vendor
+            var hasDeliveries = await _context.Deliveries.AnyAsync(d => d.VendorId == id);
+            if (hasDeliveries)
+            {
+                return BadRequest("Cannot delete vendor because it has associated deliveries. Please delete all deliveries first.");
+            }
+
+            // Check if there are any products for this vendor
+            var hasProducts = await _context.Products.AnyAsync(p => p.VendorId == id);
+            if (hasProducts)
+            {
+                return BadRequest("Cannot delete vendor because it has associated products. Please delete all products first.");
+            }
+
             _context.Vendors.Remove(vendor);
             await _context.SaveChangesAsync();
             return NoContent();

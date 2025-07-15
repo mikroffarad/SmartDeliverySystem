@@ -21,17 +21,18 @@ namespace SmartDeliverySystem.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
         {
             var products = await _context.Products
                 .Include(p => p.Vendor)
                 .ToListAsync();
 
-            return Ok(products);
+            var result = _mapper.Map<List<ProductDto>>(products);
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        public async Task<ActionResult<ProductDto>> GetProduct(int id)
         {
             var product = await _context.Products
                 .Include(p => p.Vendor)
@@ -39,41 +40,32 @@ namespace SmartDeliverySystem.Controllers
 
             if (product == null) return NotFound();
 
-            return Ok(product);
+            var result = _mapper.Map<ProductDto>(product);
+            return Ok(result);
         }
 
         [HttpPost]
-        public async Task<ActionResult<Product>> CreateProduct(ProductDto dto)
+        public async Task<ActionResult<ProductDto>> CreateProduct(ProductDto dto)
         {
             var vendor = await _context.Vendors.FindAsync(dto.VendorId);
             if (vendor == null)
-                return BadRequest($"Vendor with id {dto.VendorId} does not exist.");
+                return BadRequest($"Vendor with ID {dto.VendorId} not found.");
 
             var product = _mapper.Map<Product>(dto);
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+            var result = _mapper.Map<ProductDto>(product);
+            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, result);
         }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, ProductDto dto)
         {
             var product = await _context.Products.FindAsync(id);
             if (product == null) return NotFound();
 
-            // Перевіряємо, чи існує vendor тільки якщо vendorId змінився
-            if (product.VendorId != dto.VendorId)
-            {
-                var vendor = await _context.Vendors.FindAsync(dto.VendorId);
-                if (vendor == null)
-                    return BadRequest($"Vendor with id {dto.VendorId} does not exist.");
-            }            // Оновлюємо дані продукту
-            product.Name = dto.Name;
-            product.Weight = (decimal)dto.Weight;
-            product.Category = dto.Category;
-            product.Price = (decimal)dto.Price;
-            product.VendorId = dto.VendorId;
-
+            _mapper.Map(dto, product);
             await _context.SaveChangesAsync();
             return NoContent();
         }
@@ -83,6 +75,14 @@ namespace SmartDeliverySystem.Controllers
         {
             var product = await _context.Products.FindAsync(id);
             if (product == null) return NotFound();
+
+            // Check if product is in any deliveries
+            var hasDeliveries = await _context.DeliveryProducts.AnyAsync(dp => dp.ProductId == id);
+            if (hasDeliveries)
+            {
+                return BadRequest("Cannot delete product because it is associated with deliveries. Please delete all related deliveries first.");
+            }
+
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
             return NoContent();
