@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DeliveryData } from '../types/delivery';
 import { deliveryApi } from '../services/deliveryApi';
-import { showErrorAlert, showSuccessAlert } from '../utils/errorHandler';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 
 interface AllDeliveriesModalProps {
     isOpen: boolean;
@@ -25,6 +26,8 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
     onClose,
     onShowProducts
 }) => {
+    const { showSuccess, showError } = useToast();
+    const { showConfirmation } = useConfirmation();
     const [deliveries, setDeliveries] = useState<DeliveryHistoryItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [showGPSHistory, setShowGPSHistory] = useState(false);
@@ -35,7 +38,9 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
         if (isOpen) {
             loadAllDeliveries();
         }
-    }, [isOpen]); const getStatusText = (status: number | string) => {
+    }, [isOpen]);
+
+    const getStatusText = (status: number | string) => {
         if (typeof status === 'string') return status;
 
         // Конвертуємо числовий статус в текстовий відповідно до enum
@@ -54,7 +59,9 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
         setLoading(true);
         try {
             // Завантажуємо всі доставки (не тільки активні)
-            const allDeliveries = await deliveryApi.getAllDeliveries();            // Форматуємо дані для відображення
+            const allDeliveries = await deliveryApi.getAllDeliveries();
+
+            // Форматуємо дані для відображення
             const formattedDeliveries = allDeliveries.map((delivery: any) => ({
                 id: delivery.id || delivery.deliveryId,
                 deliveryId: delivery.id || delivery.deliveryId,
@@ -69,11 +76,14 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
             setDeliveries(formattedDeliveries);
         } catch (error) {
             console.error('Error loading all deliveries:', error);
+            showError('Error loading deliveries. Please try again.');
             setDeliveries([]);
         } finally {
             setLoading(false);
         }
-    }; const handleShowGPSHistory = async (deliveryId: number) => {
+    };
+
+    const handleShowGPSHistory = async (deliveryId: number) => {
         setLoading(true);
         try {
             const history = await deliveryApi.getDeliveryLocationHistory(deliveryId);
@@ -82,27 +92,38 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
             setShowGPSHistory(true);
         } catch (error) {
             console.error('Error loading GPS history:', error);
-            showErrorAlert(error, 'Error loading GPS history');
+            showError('Error loading GPS history. Please try again.');
         } finally {
             setLoading(false);
         }
-    }; const handleDeleteDelivery = async (deliveryId: number) => {
-        if (!window.confirm('Are you sure you want to delete this delivery?')) {
-            return;
-        }
+    };
 
-        setLoading(true); try {
+    const handleDeleteDelivery = async (deliveryId: number) => {
+        const confirmed = await showConfirmation({
+            title: 'Delete Delivery',
+            message: 'Are you sure you want to delete this delivery? This action cannot be undone.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            confirmColor: '#dc3545'
+        });
+
+        if (!confirmed) return;
+
+        setLoading(true);
+        try {
             await deliveryApi.deleteDelivery(deliveryId);
-            showSuccessAlert('Delivery deleted successfully');
+            showSuccess('Delivery deleted successfully');
             // Reload deliveries after deletion
             await loadAllDeliveries();
         } catch (error) {
             console.error('Error deleting delivery:', error);
-            showErrorAlert(error, 'Error deleting delivery');
+            showError('Error deleting delivery. Please try again.');
         } finally {
             setLoading(false);
         }
-    }; const getStatusColor = (status: string) => {
+    };
+
+    const getStatusColor = (status: string) => {
         switch (status) {
             case 'PendingPayment': return '#ffc107';
             case 'Paid': return '#17a2b8';
@@ -142,69 +163,71 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                     <th style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'left' }}>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>                                {deliveries.map(delivery => (
-                                <tr key={delivery.id}>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.deliveryId}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.vendor}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.store}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                        <span style={{
-                                            backgroundColor: getStatusColor(delivery.status),
-                                            color: 'white',
-                                            padding: '2px 8px',
-                                            borderRadius: '12px',
-                                            fontSize: '12px'
-                                        }}>
-                                            {delivery.status}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>${delivery.totalAmount.toFixed(2)}</td>
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.createdAt}</td>                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                        <div style={{ display: 'flex', gap: '5px' }}>
-                                            <button
-                                                onClick={() => handleShowGPSHistory(delivery.deliveryId)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    backgroundColor: '#17a2b8',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    fontSize: '11px'
-                                                }}
-                                            >
-                                                📍 GPS History
-                                            </button>
-                                            <button
-                                                onClick={() => onShowProducts(delivery.deliveryId)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    backgroundColor: '#28a745',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    fontSize: '11px'
-                                                }}
-                                            >
-                                                📦 Products
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteDelivery(delivery.deliveryId)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    backgroundColor: '#dc3545',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    fontSize: '11px'
-                                                }}
-                                                disabled={loading}
-                                            >
-                                                ❌ Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            <tbody>
+                                {deliveries.map(delivery => (
+                                    <tr key={delivery.id}>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.deliveryId}</td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.vendor}</td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.store}</td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                            <span style={{
+                                                backgroundColor: getStatusColor(delivery.status),
+                                                color: 'white',
+                                                padding: '2px 8px',
+                                                borderRadius: '12px',
+                                                fontSize: '12px'
+                                            }}>
+                                                {delivery.status}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>${delivery.totalAmount.toFixed(2)}</td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.createdAt}</td>
+                                        <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                            <div style={{ display: 'flex', gap: '5px' }}>
+                                                <button
+                                                    onClick={() => handleShowGPSHistory(delivery.deliveryId)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        backgroundColor: '#17a2b8',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '3px',
+                                                        fontSize: '11px'
+                                                    }}
+                                                >
+                                                    📍 GPS History
+                                                </button>
+                                                <button
+                                                    onClick={() => onShowProducts(delivery.deliveryId)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        backgroundColor: '#28a745',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '3px',
+                                                        fontSize: '11px'
+                                                    }}
+                                                >
+                                                    📦 Products
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteDelivery(delivery.deliveryId)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        backgroundColor: '#dc3545',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '3px',
+                                                        fontSize: '11px'
+                                                    }}
+                                                    disabled={loading}
+                                                >
+                                                    ❌ Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>

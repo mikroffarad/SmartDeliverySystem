@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VendorData, StoreData, ProductData } from '../types/delivery';
 import { deliveryApi } from '../services/deliveryApi';
+import { useToast } from '../contexts/ToastContext';
 
 interface CreateDeliveryModalProps {
     isOpen: boolean;
@@ -21,10 +22,10 @@ interface ProductSelection {
 export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
     isOpen,
     vendorId,
-    vendorName,
-    onClose,
+    vendorName, onClose,
     onDeliveryCreated
 }) => {
+    const { showError, showSuccess } = useToast();
     const [products, setProducts] = useState<ProductData[]>([]);
     const [stores, setStores] = useState<StoreData[]>([]);
     const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
@@ -80,7 +81,7 @@ export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
     const handleAutoSelectStore = async () => {
         const selectedProducts = getSelectedProducts();
         if (selectedProducts.length === 0) {
-            alert('Please select at least one product with quantity > 0 before auto-selecting store');
+            showError('Please select at least one product with quantity > 0 before auto-selecting store');
             return;
         }
 
@@ -88,10 +89,10 @@ export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
         try {
             const result = await deliveryApi.findBestStore(vendorId!, selectedProducts);
             setSelectedStoreId(result.storeId);
-            alert(`🎯 Best store selected: ${result.storeName}\n\nDistance: ${result.distance?.toFixed(2)} km\nReason: Optimal combination of distance and inventory balance`);
+            showSuccess(`🎯 Best store selected: ${result.storeName}\n\nDistance: ${result.distance?.toFixed(2)} km\nReason: Optimal combination of distance and inventory balance`);
         } catch (error) {
             console.error('Error auto-selecting store:', error);
-            alert('Error finding best store. Please try again.');
+            showError('Error finding best store. Please try again.');
         } finally {
             setAutoSelectLoading(false);
         }
@@ -101,12 +102,12 @@ export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
         const selectedProducts = getSelectedProducts();
 
         if (selectedProducts.length === 0) {
-            alert('Please select at least one product with quantity > 0');
+            showError('Please select at least one product with quantity > 0');
             return;
         }
 
         if (!selectedStoreId) {
-            alert('Please select a destination store or use Auto-select');
+            showError('Please select a destination store or use Auto-select');
             return;
         }
 
@@ -123,7 +124,7 @@ export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
             handleClose();
         } catch (error) {
             console.error('Error creating delivery:', error);
-            alert('Error creating delivery. Please try again.');
+            showError('Error creating delivery. Please try again.');
         } finally {
             setLoading(false);
         }

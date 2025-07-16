@@ -4,7 +4,8 @@ import 'leaflet/dist/leaflet.css';
 import { deliveryApi } from '../services/deliveryApi';
 import { VendorData, StoreData, DeliveryData } from '../types/delivery';
 import { getStatusText } from '../utils/deliveryUtils';
-import { showErrorAlert, showSuccessAlert } from '../utils/errorHandler';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -36,6 +37,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     isAddingMode = false,
     refreshTrigger
 }) => {
+    const { showSuccess, showError } = useToast();
+    const { showConfirmation } = useConfirmation();
     const mapRef = useRef<L.Map | null>(null);
     const mapContainer = useRef<HTMLDivElement>(null);
     const [vendors, setVendors] = useState<VendorData[]>([]);
@@ -289,14 +292,25 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         (window as any).createDelivery = (vendorId: number) => {
             if (onCreateDelivery) onCreateDelivery(vendorId);
         }; (window as any).deleteVendor = async (vendorId: number) => {
-            if (confirm('Are you sure you want to delete this vendor?')) {
-                try {
-                    await deliveryApi.deleteVendor(vendorId);
-                    loadVendorsAndStores();
-                } catch (error) {
-                    console.error('Error deleting vendor:', error);
-                    showErrorAlert(error, 'Error deleting vendor');
-                }
+            const confirmed = await showConfirmation({
+                title: 'Delete Vendor',
+                message: 'Are you sure you want to delete this vendor? This action cannot be undone.',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                confirmColor: '#dc3545'
+            });
+
+            if (!confirmed) return;
+
+            try {
+                await deliveryApi.deleteVendor(vendorId);
+                showSuccess('Vendor deleted successfully');
+                loadVendorsAndStores();
+            } catch (error) {
+                console.error('Error deleting vendor:', error);
+                const errorMessage = error instanceof Error ? error.message :
+                    (typeof error === 'string' ? error : 'Unknown error occurred');
+                showError(`Error deleting vendor: ${errorMessage}`);
             }
         };
     }, [vendors, onShowVendorProducts, onCreateDelivery]);
@@ -344,14 +358,25 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         (window as any).showStoreInventory = (storeId: number, storeName?: string) => {
             if (onShowStoreInventory) onShowStoreInventory(storeId, storeName);
         }; (window as any).deleteStore = async (storeId: number) => {
-            if (confirm('Are you sure you want to delete this store?')) {
-                try {
-                    await deliveryApi.deleteStore(storeId);
-                    loadVendorsAndStores();
-                } catch (error) {
-                    console.error('Error deleting store:', error);
-                    showErrorAlert(error, 'Error deleting store');
-                }
+            const confirmed = await showConfirmation({
+                title: 'Delete Store',
+                message: 'Are you sure you want to delete this store? This action cannot be undone.',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                confirmColor: '#dc3545'
+            });
+
+            if (!confirmed) return;
+
+            try {
+                await deliveryApi.deleteStore(storeId);
+                showSuccess('Store deleted successfully');
+                loadVendorsAndStores();
+            } catch (error) {
+                console.error('Error deleting store:', error);
+                const errorMessage = error instanceof Error ? error.message :
+                    (typeof error === 'string' ? error : 'Unknown error occurred');
+                showError(`Error deleting store: ${errorMessage}`);
             }
         };
     }, [stores, onShowStoreInventory]);    // Memoize delivery keys for comparison with coordinates

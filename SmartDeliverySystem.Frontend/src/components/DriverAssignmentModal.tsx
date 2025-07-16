@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { deliveryApi } from '../services/deliveryApi';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 
 interface DriverAssignmentModalProps {
     isOpen: boolean;
@@ -16,6 +18,8 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
     onDriverAssigned,
     onCancel
 }) => {
+    const { showSuccess, showError } = useToast();
+    const { showConfirmation } = useConfirmation();
     const [driverId, setDriverId] = useState('');
     const [gpsTrackerId, setGpsTrackerId] = useState('');
     const [loading, setLoading] = useState(false);
@@ -26,11 +30,9 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
             setDriverId(`DRIVER_${deliveryId}`);
             setGpsTrackerId(`GPS_${deliveryId}`);
         }
-    }, [deliveryId]);
-
-    const handleAssignDriver = async () => {
+    }, [deliveryId]); const handleAssignDriver = async () => {
         if (!deliveryId || !driverId || !gpsTrackerId) {
-            alert('Please fill all driver fields');
+            showError('Please fill all driver fields');
             return;
         }
 
@@ -39,25 +41,28 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
             gpsTrackerId: gpsTrackerId
         };
 
-        setLoading(true);
-        try {
+        setLoading(true); try {
             await deliveryApi.assignDriver(deliveryId, driverData);
-            alert(`🎉 Delivery activated successfully!\n\nDelivery ID: ${deliveryId}\nDriver: ${driverId}\nGPS Tracker: ${gpsTrackerId}\n\nThe delivery is now active and tracking will begin.`);
+            showSuccess(`🎉 Delivery activated successfully!\n\nDelivery ID: ${deliveryId}\nDriver: ${driverId}\nGPS Tracker: ${gpsTrackerId}\n\nThe delivery is now active and tracking will begin.`);
             onDriverAssigned();
             handleClose();
         } catch (error) {
             console.error('Error assigning driver:', error);
-            alert('Error assigning driver. Please try again.');
+            showError('Error assigning driver. Please try again.');
         } finally {
             setLoading(false);
         }
-    };
+    }; const handleCancel = async () => {
+        const confirmed = await showConfirmation({
+            title: 'Cancel Delivery',
+            message: 'Are you sure you want to cancel this delivery? This action cannot be undone.',
+            confirmText: 'Cancel Delivery',
+            cancelText: 'Keep Delivery',
+            confirmColor: '#dc3545'
+        });
 
-    const handleCancel = async () => {
-        if (confirm('Are you sure you want to cancel this delivery? This action cannot be undone.')) {
-            if (deliveryId) {
-                onCancel(deliveryId);
-            }
+        if (confirmed && deliveryId) {
+            onCancel(deliveryId);
         }
     };
 

@@ -12,9 +12,13 @@ import { DeliveryProductsModal } from './components/DeliveryProductsModal';
 import { DeliveryData, ConnectionStatus, LocationData } from './types/delivery';
 import { deliveryApi } from './services/deliveryApi';
 import { getStatusText } from './utils/deliveryUtils';
+import { ToastProvider, useToast } from './contexts/ToastContext';
+import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import './index.css';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+    const { showSuccess, showError, showWarning, showInfo } = useToast();
+
     const [deliveryData, setDeliveryData] = useState<Record<string, DeliveryData>>({});
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -222,10 +226,10 @@ const App: React.FC = () => {
         try {
             if (addingType === 'vendor') {
                 await deliveryApi.createVendor(locationData);
-                alert('Vendor created successfully!');
+                showSuccess('Vendor created successfully!');
             } else if (addingType === 'store') {
                 await deliveryApi.createStore(locationData);
-                alert('Store created successfully!');
+                showSuccess('Store created successfully!');
             } setShowAddModal(false);
             setAddingType(null);
             setSelectedLocation(null);
@@ -233,7 +237,7 @@ const App: React.FC = () => {
             setRefreshTrigger(prev => prev + 1);
         } catch (error) {
             console.error('Error saving location:', error);
-            alert('Error saving location. Please try again.');
+            showError('Error saving location. Please try again.');
         }
     }; const handleCancelAdd = () => {
         setShowAddModal(false);
@@ -280,15 +284,16 @@ const App: React.FC = () => {
     const handleCancelDelivery = async (deliveryId: number) => {
         try {
             await deliveryApi.cancelDelivery(deliveryId);
-            alert('❌ Delivery has been cancelled');
+            showSuccess('Delivery has been cancelled');
             setShowPaymentModal(false);
-            setShowDriverModal(false); setCurrentDeliveryId(null);
+            setShowDriverModal(false);
+            setCurrentDeliveryId(null);
             setCurrentTotalAmount(0);
             setCurrentVendorName('');
             // No need to reload - SignalR will automatically update delivery status
         } catch (error) {
             console.error('Error cancelling delivery:', error);
-            alert('Error cancelling delivery. Please try again.');
+            showError('Error cancelling delivery. Please try again.');
         }
     }; const handleDeliveryArrived = (deliveryId: string) => {
         console.log(`🎯 Delivery ${deliveryId} arrived - removing from state`);
@@ -512,6 +517,16 @@ const App: React.FC = () => {
                 }}
             />
         </div>
+    );
+};
+
+const App: React.FC = () => {
+    return (
+        <ConfirmationProvider>
+            <ToastProvider>
+                <AppContent />
+            </ToastProvider>
+        </ConfirmationProvider>
     );
 };
 

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { deliveryApi } from '../services/deliveryApi';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 
 interface PaymentModalProps {
     isOpen: boolean;
@@ -18,12 +20,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     onPaymentProcessed,
     onCancel
 }) => {
+    const { showError } = useToast();
+    const { showConfirmation } = useConfirmation();
     const [paymentMethod, setPaymentMethod] = useState<'CreditCard' | 'Cash' | 'BankTransfer'>('CreditCard');
     const [loading, setLoading] = useState(false);
 
     const handleProcessPayment = async () => {
         if (!deliveryId) {
-            alert('Please select a payment method');
+            showError('Please select a payment method');
             return;
         }
 
@@ -38,17 +42,21 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             console.error('Error processing payment:', error);
             // Show the specific error message from the server
             const errorMessage = error.message || 'Error processing payment. Please try again.';
-            alert(errorMessage);
+            showError(errorMessage);
         } finally {
             setLoading(false);
         }
-    };
+    }; const handleCancel = async () => {
+        const confirmed = await showConfirmation({
+            title: 'Cancel Delivery',
+            message: 'Are you sure you want to cancel this delivery? This action cannot be undone.',
+            confirmText: 'Cancel Delivery',
+            cancelText: 'Keep Delivery',
+            confirmColor: '#dc3545'
+        });
 
-    const handleCancel = async () => {
-        if (confirm('Are you sure you want to cancel this delivery? This action cannot be undone.')) {
-            if (deliveryId) {
-                onCancel(deliveryId);
-            }
+        if (confirmed && deliveryId) {
+            onCancel(deliveryId);
         }
     };
 

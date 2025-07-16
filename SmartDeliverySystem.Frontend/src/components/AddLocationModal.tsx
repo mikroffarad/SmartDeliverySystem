@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LocationData } from '../types/delivery';
+import { useToast } from '../contexts/ToastContext';
 
 interface AddLocationModalProps {
     isOpen: boolean;
@@ -12,10 +13,10 @@ interface AddLocationModalProps {
 export const AddLocationModal: React.FC<AddLocationModalProps> = ({
     isOpen,
     addingType,
-    selectedLocation,
-    onSave,
+    selectedLocation, onSave,
     onCancel
 }) => {
+    const { showError } = useToast();
     const [name, setName] = useState('');
     const [latitude, setLatitude] = useState(0);
     const [longitude, setLongitude] = useState(0);
@@ -35,16 +36,14 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
         }
     }, [isOpen]);
 
-    if (!isOpen) return null;
-
-    const handleSubmit = (e: React.FormEvent) => {
+    if (!isOpen) return null; const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) {
-            alert('Please enter a name');
+            showError('Please enter a name');
             return;
         }
         if (latitude === 0 && longitude === 0) {
-            alert('Please select a location on the map');
+            showError('Please select a location on the map');
             return;
         }
 

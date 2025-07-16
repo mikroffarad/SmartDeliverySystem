@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ProductData } from '../types/delivery';
 import { deliveryApi } from '../services/deliveryApi';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 
 interface VendorProductsModalProps {
     isOpen: boolean;
@@ -13,13 +15,15 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
     vendorId,
     onClose
 }) => {
+    const { showSuccess, showError } = useToast();
+    const { showConfirmation } = useConfirmation();
     const [products, setProducts] = useState<ProductData[]>([]);
     const [vendorName, setVendorName] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [showAddProduct, setShowAddProduct] = useState(false);
     const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
-    const [bulkMode, setBulkMode] = useState(false); // Новий стан для bulk режиму
-    const [csvData, setCsvData] = useState(''); // Для CSV даних
+    const [bulkMode, setBulkMode] = useState(false);
+    const [csvData, setCsvData] = useState('');
     const [newProduct, setNewProduct] = useState({
         name: '',
         weight: 0,
@@ -55,48 +59,44 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
 
         setLoading(true);
         try {
-            // Завантажуємо список всіх вендорів щоб знайти назву
             const vendors = await deliveryApi.getAllVendors();
             const vendor = vendors.find(v => v.id === vendorId);
             setVendorName(vendor?.name || `Vendor #${vendorId}`);
 
-            // Завантажуємо реальні продукти вендора
             const vendorProducts = await deliveryApi.getVendorProducts(vendorId);
             setProducts(vendorProducts);
         } catch (error) {
             console.error('Error loading vendor products:', error);
-            setProducts([]); // Порожній список при помилці
+            setProducts([]);
         } finally {
             setLoading(false);
         }
-    };
-
-    if (!isOpen) return null; const handleAddProduct = async () => {
-        if (!vendorId || !newProduct.name || newProduct.price <= 0) {
-            alert('Please fill in all required fields');
+    };    const handleAddProduct = async () => {
+        if (!vendorId || !newProduct.name || !newProduct.category || newProduct.price <= 0) {
+            showError('Please fill in all required fields including category');
             return;
         }
 
         try {
             await deliveryApi.addProductToVendor(vendorId, newProduct);
+            showSuccess('Product added successfully!');
             setNewProduct({ name: '', weight: 0, category: '', price: 0 });
             setShowAddProduct(false);
-            loadVendorProducts(); // Refresh list
+            loadVendorProducts();
         } catch (error) {
             console.error('Error adding product:', error);
-            alert('Error adding product. Please try again.');
+            showError('Error adding product. Please try again.');
         }
     };
 
-    // Функція для обробки CSV даних
     const handleBulkAdd = async () => {
         if (!vendorId || !csvData.trim()) {
-            alert('Please enter CSV data');
+            showError('Please enter CSV data');
             return;
         }
 
         const lines = csvData.trim().split('\n');
-        const products = [];
+        const newProducts = [];
         let errorLines = [];
 
         for (let i = 0; i < lines.length; i++) {
@@ -111,13 +111,11 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
 
             const [name, category, weight, price] = parts;
 
-            // Перевіряємо категорію
             if (!predefinedCategories.includes(category)) {
                 errorLines.push(`Line ${i + 1}: Invalid category "${category}". Must be one of: ${predefinedCategories.join(', ')}`);
                 continue;
             }
 
-            // Перевіряємо числові значення
             const weightNum = parseFloat(weight);
             const priceNum = parseFloat(price);
 
@@ -131,7 +129,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                 continue;
             }
 
-            products.push({
+            newProducts.push({
                 name,
                 category,
                 weight: weightNum,
@@ -140,29 +138,28 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
         }
 
         if (errorLines.length > 0) {
-            alert(`Found errors in CSV data:\n\n${errorLines.join('\n')}`);
+            showError(`Found errors in CSV data:\n\n${errorLines.join('\n')}`);
             return;
         }
 
-        if (products.length === 0) {
-            alert('No valid products found in CSV data');
+        if (newProducts.length === 0) {
+            showError('No valid products found in CSV data');
             return;
         }
 
         try {
-            // Додаємо всі продукти
-            for (const product of products) {
+            for (const product of newProducts) {
                 await deliveryApi.addProductToVendor(vendorId, product);
             }
 
-            alert(`✅ Successfully added ${products.length} products!`);
+            showSuccess(`Successfully added ${newProducts.length} products!`);
             setCsvData('');
             setShowAddProduct(false);
             setBulkMode(false);
-            loadVendorProducts(); // Refresh list
+            loadVendorProducts();
         } catch (error) {
             console.error('Error adding products:', error);
-            alert('Error adding products. Please try again.');
+            showError('Error adding products. Please try again.');
         }
     };
 
@@ -175,48 +172,57 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
             price: product.price
         });
         setShowAddProduct(true);
-    }; const handleUpdateProduct = async () => {
-        if (!editingProduct || !editingProduct.id || !newProduct.name || newProduct.price <= 0) {
-            alert('Please fill in all required fields');
+    };    const handleUpdateProduct = async () => {
+        if (!editingProduct || !editingProduct.id || !newProduct.name || !newProduct.category || newProduct.price <= 0) {
+            showError('Please fill in all required fields including category');
             return;
         }
 
         try {
-            // Додаємо vendorId до продукту при оновленні
             const productToUpdate = {
                 ...newProduct,
-                vendorId: editingProduct.vendorId
+                vendorId: editingProduct.vendorId || vendorId!
             };
             await deliveryApi.updateProduct(editingProduct.id, productToUpdate);
+            showSuccess('Product updated successfully!');
             setNewProduct({ name: '', weight: 0, category: '', price: 0 });
             setEditingProduct(null);
             setShowAddProduct(false);
-            loadVendorProducts(); // Refresh list
+            loadVendorProducts();
         } catch (error) {
             console.error('Error updating product:', error);
-            alert('Error updating product. Please try again.');
+            showError('Error updating product. Please try again.');
         }
-    };
+    };const handleDeleteProduct = async (productId: number) => {
+        const confirmed = await showConfirmation({
+            title: 'Delete Product',
+            message: 'Are you sure you want to delete this product? This action cannot be undone.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            confirmColor: '#dc3545'
+        });
 
-    const handleDeleteProduct = async (productId: number) => {
-        if (!confirm('Are you sure you want to delete this product?')) {
-            return;
-        }
+        if (!confirmed) return;
 
         try {
             await deliveryApi.deleteProduct(productId);
-            loadVendorProducts(); // Refresh list
+            showSuccess('Product deleted successfully!');
+            loadVendorProducts();
         } catch (error) {
             console.error('Error deleting product:', error);
-            alert(error);
+            showError('Error deleting product. Please try again.');
         }
-    }; const handleCancelEdit = () => {
+    };
+
+    const handleCancelEdit = () => {
         setShowAddProduct(false);
         setEditingProduct(null);
         setBulkMode(false);
         setCsvData('');
         setNewProduct({ name: '', weight: 0, category: '', price: 0 });
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="modal">
@@ -235,75 +241,78 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                         {products.length === 0 ? (
                             <p>No products available for this vendor.</p>
                         ) : (
-                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>                                {products.map(product => (
-                                <div key={product.id} className="product-item" style={{
-                                    padding: '12px',
-                                    marginBottom: '10px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '6px',
-                                    backgroundColor: '#f9f9f9'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div style={{ flex: 1 }}>
-                                            <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: '16px' }}>
-                                                {product.name}
-                                            </h4>
-                                            <div style={{ fontSize: '14px', color: '#666' }}>
-                                                <span style={{
-                                                    display: 'inline-block',
-                                                    background: '#e9ecef',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '12px',
-                                                    marginRight: '8px',
-                                                    fontSize: '12px'
+                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                {products.map(product => (
+                                    <div key={product.id} className="product-item" style={{
+                                        padding: '12px',
+                                        marginBottom: '10px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '6px',
+                                        backgroundColor: '#f9f9f9'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <h4 style={{ margin: '0 0 8px 0', color: '#333', fontSize: '16px' }}>
+                                                    {product.name}
+                                                </h4>
+                                                <div style={{ fontSize: '14px', color: '#666' }}>
+                                                    <span style={{
+                                                        display: 'inline-block',
+                                                        background: '#e9ecef',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '12px',
+                                                        marginRight: '8px',
+                                                        fontSize: '12px'
+                                                    }}>
+                                                        {product.category}
+                                                    </span>
+                                                    <span>Weight: {product.weight} kg</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{
+                                                    fontSize: '18px',
+                                                    fontWeight: 'bold',
+                                                    color: '#28a745'
                                                 }}>
-                                                    {product.category}
-                                                </span>
-                                                <span>Weight: {product.weight} kg</span>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                                            <div style={{
-                                                fontSize: '18px',
-                                                fontWeight: 'bold',
-                                                color: '#28a745'
-                                            }}>
-                                                ${product.price.toFixed(2)}
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '5px' }}>
-                                                <button
-                                                    onClick={() => handleEditProduct(product)}
-                                                    style={{
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        padding: '4px 8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '14px'
-                                                    }}
-                                                    title="Edit product"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteProduct(product.id || 0)}
-                                                    style={{
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        padding: '4px 8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '14px'
-                                                    }}
-                                                    title="Delete product"
-                                                >
-                                                    ❌
-                                                </button>
+                                                    ${product.price.toFixed(2)}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <button
+                                                        onClick={() => handleEditProduct(product)}
+                                                        style={{
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            padding: '4px 8px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '14px'
+                                                        }}
+                                                        title="Edit product"
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(product.id || 0)}
+                                                        style={{
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            padding: '4px 8px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '14px'
+                                                        }}
+                                                        title="Delete product"
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                             </div>
-                        )}                        <div className="form-actions" style={{ marginTop: '20px' }}>
+                        )}
+
+                        <div className="form-actions" style={{ marginTop: '20px' }}>
                             <button className="btn-secondary" onClick={onClose}>
                                 Close
                             </button>
@@ -329,7 +338,6 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                             </button>
                         </div>
 
-                        {/* Add Product Form */}
                         {showAddProduct && (
                             <div style={{
                                 marginTop: '20px',
@@ -352,7 +360,9 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                                 style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
                                                 placeholder="Enter product name"
                                             />
-                                        </div>                                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                                             <div style={{ flex: 1 }}>
                                                 <label style={{ display: 'block', marginBottom: '5px' }}>Category:</label>
                                                 <select
@@ -386,7 +396,9 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                                     style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
                                                 />
                                             </div>
-                                        </div><div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                                             <button
                                                 onClick={handleCancelEdit}
                                                 style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
@@ -441,6 +453,6 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                     </div>
                 )}
             </div>
-        </div >
+        </div>
     );
 };
