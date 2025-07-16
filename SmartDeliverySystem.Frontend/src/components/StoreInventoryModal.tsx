@@ -162,15 +162,13 @@ export const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({
                                     width: '100%',
                                     borderCollapse: 'collapse',
                                     marginTop: '10px'
-                                }}>
-                                    <thead>
+                                }}>                                    <thead>
                                         <tr style={{ backgroundColor: '#f8f9fa' }}>
                                             <th style={tableHeaderStyle}>Product Name</th>
                                             <th style={tableHeaderStyle}>Category</th>
                                             <th style={tableHeaderStyle}>Quantity</th>
                                             <th style={tableHeaderStyle}>Price per Unit</th>
                                             <th style={tableHeaderStyle}>Total Value</th>
-                                            <th style={tableHeaderStyle}>Last Updated</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -199,12 +197,8 @@ export const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({
                                                 </td>
                                                 <td style={{ ...tableCellStyle, textAlign: 'right' }}>
                                                     ${item.price.toFixed(2)}
-                                                </td>
-                                                <td style={{ ...tableCellStyle, textAlign: 'right', fontWeight: 'bold' }}>
+                                                </td>                                                <td style={{ ...tableCellStyle, textAlign: 'right', fontWeight: 'bold' }}>
                                                     ${(item.quantity * item.price).toFixed(2)}
-                                                </td>                                                <td style={{ ...tableCellStyle, fontSize: '12px', color: '#6c757d' }}>
-                                                    {/* Since lastUpdated might not exist, we'll show a placeholder */}
-                                                    Recent
                                                 </td>
                                             </tr>
                                         ))}
