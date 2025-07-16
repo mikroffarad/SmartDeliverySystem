@@ -127,14 +127,12 @@ namespace SmartDeliverySystem.Azure.Functions
                     // Маршрут завершено - прибуття на місце призначення
                     _logger.LogInformation("🎯 Доставка {DeliveryId} досягла призначення", delivery.DeliveryId);
                     _activeRoutes.Remove(delivery.DeliveryId);
-                    await ClearSavedRouteIndexAsync(delivery.DeliveryId);
-
-                    // Відправляємо оновлення з спеціальною позначкою про прибуття
+                    await ClearSavedRouteIndexAsync(delivery.DeliveryId);                    // Відправляємо оновлення з спеціальною позначкою про прибуття
                     await UpdateDeliveryLocation(delivery.DeliveryId,
                         delivery.StoreLatitude.Value, delivery.StoreLongitude.Value,
                         0, "🎯 Прибуття на місце призначення");
 
-                    // Затримка 3 секунди, потім оновлюємо статус на Delivered
+                    // Затримка 5 секунд, потім оновлюємо статус на Delivered
                     await Task.Delay(3000);
 
                     try
@@ -214,8 +212,8 @@ namespace SmartDeliverySystem.Azure.Functions
                 {
                     Latitude = coord[1], // В GeoJSON спочатку longitude, потім latitude
                     Longitude = coord[0]
-                }).ToList();                // Зменшуємо кількість точок для плавнішого руху (кожна 10-а точка)
-                var simplifiedRoute = routePoints.Where((point, index) => index % 10 == 0).ToList();
+                }).ToList();                // Зменшуємо кількість точок для плавнішого руху (кожна n-на точка)
+                var simplifiedRoute = routePoints.Where((point, index) => index % 2 == 0).ToList();
 
                 // ВАЖЛИВО: Додаємо точну кінцеву точку магазину
                 var storePoint = new RoutePoint

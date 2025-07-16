@@ -290,19 +290,6 @@ const App: React.FC = () => {
             console.error('Error cancelling delivery:', error);
             alert('Error cancelling delivery. Please try again.');
         }
-    }; const handleMarkAsDelivered = async (deliveryId: number) => {
-        if (!confirm(`Mark delivery #${deliveryId} as delivered? This will add products to store inventory.`)) {
-            return;
-        }
-
-        try {
-            await deliveryApi.updateDeliveryStatus(deliveryId, 4); // 4 = Delivered
-            alert(`✅ Delivery #${deliveryId} has been marked as delivered!\n\n📦 Products have been added to store inventory.`);
-            // No need to reload - SignalR will automatically remove the delivery from active list
-        } catch (error) {
-            console.error('Error marking delivery as delivered:', error);
-            alert('Error marking delivery as delivered. Please try again.');
-        }
     }; const handleDeliveryArrived = (deliveryId: string) => {
         console.log(`🎯 Delivery ${deliveryId} arrived - removing from state`);
         setDeliveryData(prev => {
@@ -348,10 +335,11 @@ const App: React.FC = () => {
     return (
         <div className="app">
             {/* Map */}            <div id="map">                <MapComponent
-                onLocationSelect={handleLocationSelect} deliveries={deliveryData}
+                onLocationSelect={handleLocationSelect}
+                deliveries={deliveryData}
                 onShowVendorProducts={handleShowVendorProducts}
                 onShowStoreInventory={handleShowStoreInventory}
-                onCreateDelivery={handleCreateDelivery} onMarkAsDelivered={handleMarkAsDelivered}
+                onCreateDelivery={handleCreateDelivery}
                 onDeliveryArrived={handleDeliveryArrived}
                 isAddingMode={isAddingMode}
                 addingType={addingType}
@@ -387,8 +375,18 @@ const App: React.FC = () => {
                 )}
             </div>            {/* Delivery info panel */}
             <div className="delivery-info">
+
+                <div className={`connection-status ${connectionStatus}`}>
+                    SignalR: {connectionStatus === 'connected' ? '🟢 Connected' :
+                        connectionStatus === 'disconnected' ? '🔴 Disconnected' :
+                            '⚠️ Error'}
+                </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <h3>📦 Active Deliveries</h3>
+                    <h3 style={{
+                        fontSize: '14px',
+                        marginBottom: '0'
+                    }}>📦 Active Deliveries</h3>
                     <button
                         onClick={() => setShowAllDeliveriesModal(true)}
                         style={{
@@ -402,11 +400,6 @@ const App: React.FC = () => {
                     >
                         📋 All Deliveries
                     </button>
-                </div>
-                <div className={`connection-status ${connectionStatus}`}>
-                    SignalR: {connectionStatus === 'connected' ? '🟢 Connected' :
-                        connectionStatus === 'disconnected' ? '🔴 Disconnected' :
-                            '⚠️ Error'}
                 </div>
 
                 {Object.keys(deliveryData).length === 0 ? (
@@ -425,9 +418,7 @@ const App: React.FC = () => {
                             )}
                             {delivery.totalAmount && (
                                 <p><strong>Total:</strong> ${delivery.totalAmount.toFixed(2)}</p>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                            )}                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
                                 <button
                                     onClick={() => {
                                         setSelectedDeliveryId(parseInt(deliveryId));
@@ -443,11 +434,7 @@ const App: React.FC = () => {
                                     }}
                                 >
                                     📦 Products
-                                </button>                                    {(Number(delivery.status) === 2 || Number(delivery.status) === 3) && (
-                                    <button onClick={() => handleMarkAsDelivered(parseInt(deliveryId))}>
-                                        ✅ Mark as Delivered
-                                    </button>
-                                )}
+                                </button>
                             </div>
                         </div>
                         ))}

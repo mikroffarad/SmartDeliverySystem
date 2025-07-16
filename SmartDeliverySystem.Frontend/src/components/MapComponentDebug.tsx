@@ -20,7 +20,6 @@ interface MapComponentProps {
     onShowVendorProducts?: (vendorId: number) => void;
     onShowStoreInventory?: (storeId: number, storeName?: string) => void;
     onCreateDelivery?: (vendorId: number) => void;
-    onMarkAsDelivered?: (deliveryId: number) => void;
     onDeliveryArrived?: (deliveryId: string) => void; // Новий колбек для прибуття
     isAddingMode?: boolean;
     addingType?: 'vendor' | 'store' | null;
@@ -33,7 +32,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     onShowVendorProducts,
     onShowStoreInventory,
     onCreateDelivery,
-    onMarkAsDelivered,
     onDeliveryArrived,
     isAddingMode = false,
     refreshTrigger
@@ -441,14 +439,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             });
                         } catch (error) {
                             console.error(`❌ Error updating delivery ${deliveryId} status:`, error);
-                        }
-
-                        // Show arrival notification and keep truck visible for a short time
+                        }                        // Show arrival notification and keep truck visible for 2 seconds
                         existingMarker.getPopup()?.setContent(`
-                            <div>
+                            <div style="text-align: center; padding: 10px;">
                                 <b>🚛 Delivery #${deliveryId}</b><br>
                                 Driver: ${delivery.driverId || 'Not assigned'}<br>
-                                <strong style="color: green;">🎯 ARRIVED AT DESTINATION!</strong><br>
+                                <strong style="color: green; font-size: 16px;">🎯 ARRIVED AT DESTINATION!</strong><br>
                                 <strong style="color: green;">📦 Marking as Delivered...</strong><br>
                                 Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                                 Updated: ${updateTime}
@@ -461,15 +457,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         // Notify parent component about arrival
                         if (onDeliveryArrived) {
                             onDeliveryArrived(deliveryId);
-                        }
-
-                        // Remove delivery from parent state immediately to update UI
-                        const currentDeliveries = deliveries;
-                        const updatedDeliveries = { ...currentDeliveries };
-                        delete updatedDeliveries[deliveryId];
-                        // We need to communicate this change back to the parent component
-                        // For now, we'll handle this through the normal cleanup process
-                        // Remove truck and route after 3 seconds to give user time to see arrival
+                        }                        // Remove truck and route after exactly 5 seconds to give user time to see arrival
                         setTimeout(() => {
                             console.log(`🗑️ Removing delivery ${deliveryId} after arrival display`);
 
@@ -503,12 +491,10 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                                         console.log(`🛣️ ✅ Force removed polyline`);
                                     }
                                 }
-                            });
-
-                            if (removedCount > 0) {
+                            }); if (removedCount > 0) {
                                 console.log(`🛣️ ✅ Force removed ${removedCount} additional polylines`);
                             }
-                        }, 3000);
+                        }, 3000); // 5 секунд для синхронізації з бекендом
 
                         return; // Don't continue with normal update
                     }
@@ -532,12 +518,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             Status: ${getStatusText(delivery.status)}<br>
                             Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                             Updated: ${updateTime}<br>
-                            ${(delivery.status === 2 || delivery.status === 3) ?
-                            `<button onclick="window.markAsDelivered(${deliveryId})"
-                                        style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-top: 5px; border-radius: 3px; display: block; width: 100%;">
-                                    ✅ Mark as Delivered
-                                </button>` : ''
-                        }
                         </div>
                     `);
                 } catch (error) {
@@ -563,12 +543,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             Status: ${getStatusText(delivery.status)}<br>
                             Location: ${delivery.currentLatitude.toFixed(4)}, ${delivery.currentLongitude.toFixed(4)}<br>
                             Created: ${new Date().toLocaleTimeString()}<br>
-                            ${(delivery.status === 2 || delivery.status === 3) ?
-                            `<button onclick="window.markAsDelivered(${deliveryId})"
-                                        style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-top: 5px; border-radius: 3px; display: block; width: 100%;">
-                                    ✅ Mark as Delivered
-                                </button>` : ''
-                        }
                         </div>
                     `);
                     console.log(`🚛 Bound popup to marker`);
@@ -593,6 +567,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         const currentDeliveryIds = Object.keys(deliveries);
         const existingMarkerIds = Object.keys(deliveryMarkersRef.current); existingMarkerIds.forEach(deliveryId => {
             if (!currentDeliveryIds.includes(deliveryId)) {
+                // Don't remove if delivery has arrived (let the timeout handle it)
+                if (arrivedDeliveriesRef.current.has(deliveryId)) {
+                    console.log(`🚛 ⏳ Delivery ${deliveryId} has arrived, letting timeout handle removal`);
+                    return;
+                }
+
                 console.log(`🚛 🗑️ Removing marker for delivery ${deliveryId} (no longer exists)`);
                 const marker = deliveryMarkersRef.current[deliveryId];
                 const route = deliveryRoutesRef.current[deliveryId];
@@ -613,15 +593,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 arrivedDeliveriesRef.current.delete(deliveryId);
                 console.log(`🏁 Removed delivery ${deliveryId} from arrived set`);
             }
-        });
+        }); console.log('🚛 === END DELIVERY MARKERS UPDATE ===');
 
-        (window as any).markAsDelivered = (deliveryId: number) => {
-            if (onMarkAsDelivered) onMarkAsDelivered(deliveryId);
-        };
-
-        console.log('🚛 === END DELIVERY MARKERS UPDATE ===');
-
-    }, [deliveryKeys, createTruckIcon, onMarkAsDelivered, updateDeliveryRoute]);    // Глобальна функція для очищення всіх маршрутів (для тестування)
+    }, [deliveryKeys, createTruckIcon, updateDeliveryRoute]);// Глобальна функція для очищення всіх маршрутів (для тестування)
     (window as any).clearAllRoutes = () => {
         console.log('🧹 Clearing all routes manually');
         if (mapRef.current) {
