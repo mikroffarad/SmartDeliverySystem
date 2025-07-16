@@ -428,20 +428,28 @@ namespace SmartDeliverySystem.Services
             await _context.SaveChangesAsync();
             _logger.LogInformation("Successfully removed products from store inventory for delivery {DeliveryId}", delivery.Id);
         }
-
         public async Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment)
         {
             var delivery = await _context.Deliveries.FindAsync(deliveryId);
             if (delivery == null || delivery.Status == DeliveryStatus.Paid)
                 return false;
 
-            // Remove strict amount check - allow partial payments or overpayments
+            // Strict amount check - payment must match exactly
+            if (Math.Abs(payment.Amount - delivery.TotalAmount) > 0.01m) // Allow for small floating point differences
+            {
+                _logger.LogWarning("Payment amount mismatch for delivery {DeliveryId}: Paid ${PaidAmount}, Expected ${TotalAmount}",
+                    deliveryId, payment.Amount, delivery.TotalAmount);
+                throw new InvalidOperationException($"Payment amount mismatch. Expected: ${delivery.TotalAmount:F2}, but received: ${payment.Amount:F2}");
+            }
+
             delivery.Status = DeliveryStatus.Paid;
             delivery.PaymentDate = DateTime.UtcNow;
             delivery.PaymentMethod = payment.PaymentMethod;
-            delivery.PaidAmount = payment.Amount; await _context.SaveChangesAsync();
-            _logger.LogInformation("Payment processed for delivery {DeliveryId}: ${PaidAmount} (Expected: ${TotalAmount}) via {PaymentMethod}",
-                deliveryId, payment.Amount, delivery.TotalAmount, payment.PaymentMethod);
+            delivery.PaidAmount = payment.Amount;
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Payment processed for delivery {DeliveryId}: ${PaidAmount} via {PaymentMethod}",
+                deliveryId, payment.Amount, payment.PaymentMethod);
             return true;
         }
 

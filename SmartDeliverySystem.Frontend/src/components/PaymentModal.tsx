@@ -19,37 +19,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     onCancel
 }) => {
     const [paymentMethod, setPaymentMethod] = useState<'CreditCard' | 'Cash' | 'BankTransfer'>('CreditCard');
-    const [paidAmount, setPaidAmount] = useState(totalAmount);
     const [loading, setLoading] = useState(false);
 
-    React.useEffect(() => {
-        setPaidAmount(totalAmount);
-    }, [totalAmount]);
-
     const handleProcessPayment = async () => {
-        if (!deliveryId || !paidAmount) {
-            alert('Please fill all payment fields');
+        if (!deliveryId) {
+            alert('Please select a payment method');
             return;
         }
 
-        if (paidAmount < totalAmount) {
-            if (!confirm(`Paid amount ($${paidAmount}) is less than total amount ($${totalAmount}). Continue?`)) {
-                return;
-            }
-        }
-
         const paymentData = {
-            amount: paidAmount,
+            amount: totalAmount, // Always use the exact total amount
             paymentMethod: paymentMethod
-        };
-
-        setLoading(true);
+        }; setLoading(true);
         try {
             await deliveryApi.processPayment(deliveryId, paymentData);
             onPaymentProcessed(deliveryId);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error processing payment:', error);
-            alert('Error processing payment. Please try again.');
+            // Show the specific error message from the server
+            const errorMessage = error.message || 'Error processing payment. Please try again.';
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -111,9 +100,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     }}>
                         🚛 Active
                     </div>
-                </div>
-
-                <div style={{
+                </div>                <div style={{
                     backgroundColor: '#f8f9fa',
                     padding: '20px',
                     borderRadius: '8px',
@@ -121,6 +108,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 }}>
                     <p><strong>Delivery ID:</strong> {deliveryId}</p>
                     <p><strong>Total Amount:</strong> ${totalAmount.toFixed(2)}</p>
+                    <p style={{ color: '#007bff', fontWeight: 'bold' }}>⚠️ You must pay exactly ${totalAmount.toFixed(2)}</p>
 
                     <div className="form-group">
                         <label htmlFor="paymentMethod">Payment Method:</label>
@@ -136,18 +124,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                         </select>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="paidAmount">Paid Amount:</label>
-                        <input
-                            type="number"
-                            id="paidAmount"
-                            step="0.01"
-                            value={paidAmount}
-                            onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-                            style={{ width: '100%', padding: '10px', margin: '8px 0', borderRadius: '5px', border: '1px solid #ddd' }}
-                        />
-                    </div>
-
                     <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                         <button
                             className="btn-primary"
@@ -155,7 +131,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             disabled={loading}
                             style={{ flex: 1 }}
                         >
-                            {loading ? 'Processing...' : 'Process Payment'}
+                            {loading ? 'Processing...' : `Pay $${totalAmount.toFixed(2)}`}
                         </button>
                         <button
                             onClick={handleCancel}
