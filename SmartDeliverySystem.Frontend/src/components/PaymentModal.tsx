@@ -137,11 +137,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                             className="btn-primary"
                             onClick={handleProcessPayment}
                             disabled={loading}
-                            style={{ flex: 1 }}
+                            style={{
+                                border: 'none',
+                                borderRadius: '5px',
+                                flex: 1
+                            }}
                         >
                             {loading ? 'Processing...' : `Pay $${totalAmount.toFixed(2)}`}
                         </button>
-                        <button
+                        <button className='control-buttons--cancel'
                             onClick={handleCancel}
                             style={{
                                 background: '#dc3545',

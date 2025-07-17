@@ -67,7 +67,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     gap: '12px',
                     justifyContent: 'flex-end'
                 }}>
-                    <button
+                    <button className='cancel-button'
                         onClick={onCancel}
                         style={{
                             padding: '8px 16px',
@@ -81,7 +81,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     >
                         {cancelText}
                     </button>
-                    <button
+                    <button className='control-buttons--cancel'
                         onClick={onConfirm}
                         style={{
                             padding: '8px 16px',

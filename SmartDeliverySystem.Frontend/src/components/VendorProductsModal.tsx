@@ -71,7 +71,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
         } finally {
             setLoading(false);
         }
-    };    const handleAddProduct = async () => {
+    }; const handleAddProduct = async () => {
         if (!vendorId || !newProduct.name || !newProduct.category || newProduct.price <= 0) {
             showError('Please fill in all required fields including category');
             return;
@@ -172,7 +172,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
             price: product.price
         });
         setShowAddProduct(true);
-    };    const handleUpdateProduct = async () => {
+    }; const handleUpdateProduct = async () => {
         if (!editingProduct || !editingProduct.id || !newProduct.name || !newProduct.category || newProduct.price <= 0) {
             showError('Please fill in all required fields including category');
             return;
@@ -193,7 +193,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
             console.error('Error updating product:', error);
             showError('Error updating product. Please try again.');
         }
-    };const handleDeleteProduct = async (productId: number) => {
+    }; const handleDeleteProduct = async (productId: number) => {
         const confirmed = await showConfirmation({
             title: 'Delete Product',
             message: 'Are you sure you want to delete this product? This action cannot be undone.',
@@ -278,7 +278,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                                     ${product.price.toFixed(2)}
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                                    <button
+                                                    <button className='action-button'
                                                         onClick={() => handleEditProduct(product)}
                                                         style={{
                                                             border: 'none',
@@ -291,7 +291,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                                     >
                                                         ✏️
                                                     </button>
-                                                    <button
+                                                    <button className='action-button'
                                                         onClick={() => handleDeleteProduct(product.id || 0)}
                                                         style={{
                                                             border: 'none',
@@ -324,10 +324,10 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                 }}
                                 style={{ marginLeft: '10px' }}
                             >
-                                ➕ Add Single Product
+                                📋 Add Single Product
                             </button>
                             <button
-                                className="btn-primary"
+                                className="btn-primary btn-multiple"
                                 onClick={() => {
                                     setBulkMode(true);
                                     setShowAddProduct(true);
@@ -399,15 +399,15 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                         </div>
 
                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                            <button
+                                            <button className='cancel-button'
                                                 onClick={handleCancelEdit}
-                                                style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+                                                style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                                             >
                                                 Cancel
                                             </button>
-                                            <button
+                                            <button className='save-button'
                                                 onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
-                                                style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}
+                                                style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                                             >
                                                 {editingProduct ? 'Update Product' : 'Save Product'}
                                             </button>
@@ -433,13 +433,13 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
                                             />
                                         </div>
                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                            <button
+                                            <button className='cancel-button'
                                                 onClick={handleCancelEdit}
                                                 style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
                                             >
                                                 Cancel
                                             </button>
-                                            <button
+                                            <button className='save-button'
                                                 onClick={handleBulkAdd}
                                                 style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px' }}
                                             >

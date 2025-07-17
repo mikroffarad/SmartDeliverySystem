@@ -62,7 +62,7 @@ body {
 }
 
 .control-buttons button:hover {
-    background: #0056b3;
+    background: #0057b3;
 }
 
 /* Delivery info panel */
@@ -275,6 +275,80 @@ body {
 
 .btn-danger:hover {
     background: #c82333;
+}
+
+.all-deliveries-button {
+    padding: 5px 10px;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.all-deliveries-button:hover {
+    background-color: #0c5864;
+}
+
+.marker-button {
+    cursor: pointer;
+}
+
+.marker-button--products {
+    background: #28a745;
+}
+
+.marker-button--products:hover {
+    background: #218d3a;
+}
+
+.marker-button--create-delivery {
+    background: #007bff;
+}
+
+.marker-button--create-delivery:hover {
+    background: #005fc4;
+}
+
+.marker-button--delete {
+    background: #dc3545;
+}
+
+.marker-button--delete:hover {
+    background: #b12c39;
+}
+
+.marker-button--inventory {
+    background: #17a2b8;
+}
+
+.marker-button--inventory:hover {
+    background: #107584;
+}
+
+.action-button {
+    background-color: #f0f0f0;
+}
+
+.action-button:hover {
+    background-color: #525050;
+}
+
+.btn-multiple:hover {
+    background-color: #107382 !important;
+}
+
+.cancel-button:hover {
+    background-color: #525050 !important;
+}
+
+.save-button:hover {
+    background-color: #1a6c2d !important;
+}
+
+.control-buttons--cancel:hover {
+    background-color: #a72835 !important;
 }
 
 /* Responsive design */

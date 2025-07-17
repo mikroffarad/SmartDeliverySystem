@@ -433,7 +433,7 @@
                     <select id="storeSelect" required style="flex: 1;">
                         <option value="">Choose a store...</option>
                     </select>
-                    <button type="button" id="autoSelectBtn"
+                    <button type="button" id="autoSelectBtn" class="save-button"
                         style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; white-space: nowrap;">
                         🎯 Auto-select best store
                     </button>
@@ -1706,16 +1706,16 @@
         async function showLocationHistory(deliveryId) {
             try {
                 const response = await fetch(`https://localhost:7183/api/delivery/${deliveryId}/location-history`);
-                
+
                 if (response.ok) {
                     const history = await response.json();
-                    
+
                     console.log('GPS History:', history);
-                    
+
                     if (history.length > 0) {
                         let historyText = `📍 GPS History for Delivery ${deliveryId}:\n\n`;
                         historyText += `Total GPS points recorded: ${history.length}\n\n`;
-                        
+
                         // Show last 5 GPS points for preview
                         const recentPoints = history.slice(-5);
                         historyText += "Recent GPS points:\n";
@@ -1727,7 +1727,7 @@
                             if (point.notes) historyText += `   Notes: ${point.notes}\n`;
                             historyText += "\n";
                         });
-                        
+
                         historyText += "\n💡 Check browser console for full GPS data";
                         alert(historyText);
                     } else {

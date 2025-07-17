@@ -268,16 +268,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         <div>
                             <b>🏭 ${vendor.name}</b><br>
                             Vendor<br>
-                            <button onclick="window.showVendorProducts(${vendor.id})"
-                                    style="background: #28a745; color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
+                            <button class="marker-button marker-button--products" onclick="window.showVendorProducts(${vendor.id})"
+                                    style="color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
                                 📦 Products
                             </button>
-                            <button onclick="window.createDelivery(${vendor.id})"
-                                    style="background: #007bff; color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
+                            <button class="marker-button marker-button--create-delivery" onclick="window.createDelivery(${vendor.id})"
+                                    style="color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
                                 🚛 Create Delivery
                             </button>
-                            <button onclick="window.deleteVendor(${vendor.id})"
-                                    style="background: #dc3545; color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
+                            <button class="marker-button marker-button--delete" onclick="window.deleteVendor(${vendor.id})"
+                                    style="color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
                                 🗑️ Delete
                             </button>
                         </div>
@@ -341,12 +341,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         <div>
                             <b>🏪 ${store.name}</b><br>
                             Store<br>
-                            <button onclick="window.showStoreInventory(${store.id}, '${store.name}')"
-                                    style="background: #17a2b8; color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
+                            <button class="marker-button marker-button--inventory" onclick="window.showStoreInventory(${store.id}, '${store.name}')"
+                                    style="color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
                                 📋 Inventory
                             </button>
-                            <button onclick="window.deleteStore(${store.id})"
-                                    style="background: #dc3545; color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
+                            <button class="marker-button marker-button--delete" onclick="window.deleteStore(${store.id})"
+                                    style=" color: white; border: none; padding: 5px 10px; margin: 2px; border-radius: 3px; display: block; width: 100%;">
                                 🗑️ Delete
                             </button>
                         </div>

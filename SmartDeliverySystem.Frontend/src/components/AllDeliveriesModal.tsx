@@ -184,7 +184,7 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                         <td style={{ padding: '10px', border: '1px solid #ddd' }}>{delivery.createdAt}</td>
                                         <td style={{ padding: '10px', border: '1px solid #ddd' }}>
                                             <div style={{ display: 'flex', gap: '5px' }}>
-                                                <button
+                                                <button className='btn-multiple'
                                                     onClick={() => handleShowGPSHistory(delivery.deliveryId)}
                                                     style={{
                                                         padding: '4px 8px',
@@ -192,12 +192,13 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                                         color: 'white',
                                                         border: 'none',
                                                         borderRadius: '3px',
-                                                        fontSize: '11px'
+                                                        fontSize: '11px',
+                                                        cursor: 'pointer'
                                                     }}
                                                 >
                                                     📍 GPS History
                                                 </button>
-                                                <button
+                                                <button className='save-button'
                                                     onClick={() => onShowProducts(delivery.deliveryId)}
                                                     style={{
                                                         padding: '4px 8px',
@@ -205,12 +206,13 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                                         color: 'white',
                                                         border: 'none',
                                                         borderRadius: '3px',
-                                                        fontSize: '11px'
+                                                        fontSize: '11px',
+                                                        cursor: 'pointer'
                                                     }}
                                                 >
                                                     📦 Products
                                                 </button>
-                                                <button
+                                                <button className='control-buttons--cancel'
                                                     onClick={() => handleDeleteDelivery(delivery.deliveryId)}
                                                     style={{
                                                         padding: '4px 8px',
@@ -218,7 +220,8 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
                                                         color: 'white',
                                                         border: 'none',
                                                         borderRadius: '3px',
-                                                        fontSize: '11px'
+                                                        fontSize: '11px',
+                                                        cursor: 'pointer'
                                                     }}
                                                     disabled={loading}
                                                 >

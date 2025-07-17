@@ -352,30 +352,18 @@ const AppContent: React.FC = () => {
             />
             </div>{/* Control buttons */}
             <div className="control-buttons">
-                <button
-                    onClick={handleAddVendor}
-                    style={{
-                        backgroundColor: isAddingMode && addingType === 'vendor' ? '#ffc107' : '#007bff',
-                        color: isAddingMode && addingType === 'vendor' ? '#000' : '#fff'
-                    }}
-                >
+                <button onClick={handleAddVendor}>
                     🏭 {isAddingMode && addingType === 'vendor' ? 'Click on map to add vendor' : 'Add Vendor'}
                 </button>
-                <button
-                    onClick={handleAddStore}
-                    style={{
-                        backgroundColor: isAddingMode && addingType === 'store' ? '#ffc107' : '#007bff',
-                        color: isAddingMode && addingType === 'store' ? '#000' : '#fff'
-                    }}
-                >
+                <button onClick={handleAddStore}>
                     🏪 {isAddingMode && addingType === 'store' ? 'Click on map to add store' : 'Add Store'}
                 </button>
                 {isAddingMode && (
-                    <button
+                    <button className='control-buttons--cancel'
                         onClick={handleCancelAdd}
                         style={{ backgroundColor: '#dc3545', color: '#fff' }}
                     >
-                        ✖️ Cancel
+                        ❌ Cancel
                     </button>
                 )}
             </div>            {/* Delivery info panel */}
@@ -394,14 +382,7 @@ const AppContent: React.FC = () => {
                     }}>📦 Active Deliveries</h3>
                     <button
                         onClick={() => setShowAllDeliveriesModal(true)}
-                        style={{
-                            padding: '5px 10px',
-                            backgroundColor: '#17a2b8',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            fontSize: '12px'
-                        }}
+                        className='all-deliveries-button'
                     >
                         📋 All Deliveries
                     </button>
@@ -425,6 +406,7 @@ const AppContent: React.FC = () => {
                                 <p><strong>Total:</strong> ${delivery.totalAmount.toFixed(2)}</p>
                             )}                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
                                 <button
+                                    className='save-button'
                                     onClick={() => {
                                         setSelectedDeliveryId(parseInt(deliveryId));
                                         setShowDeliveryProductsModal(true);

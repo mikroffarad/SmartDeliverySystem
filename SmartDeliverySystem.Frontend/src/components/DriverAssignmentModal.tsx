@@ -184,11 +184,15 @@ export const DriverAssignmentModal: React.FC<DriverAssignmentModalProps> = ({
                             className="btn-primary"
                             onClick={handleAssignDriver}
                             disabled={loading}
-                            style={{ flex: 1 }}
+                            style={{
+                                border: 'none',
+                                borderRadius: '5px',
+                                flex: 1
+                            }}
                         >
                             {loading ? 'Assigning...' : 'Assign Driver & Activate'}
                         </button>
-                        <button
+                        <button className='control-buttons--cancel'
                             onClick={handleCancel}
                             style={{
                                 background: '#dc3545',

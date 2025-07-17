@@ -84,19 +84,7 @@ export const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({
                     <h2 style={{ margin: 0, color: '#333' }}>
                         📋 Inventory - {storeName}
                     </h2>
-                    <button
-                        onClick={handleClose}
-                        style={{
-                            background: '#6c757d',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '8px 12px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        ✖️ Close
-                    </button>
+                    <button className="close-button" onClick={handleClose}>×</button>
                 </div>
 
                 {loading && (

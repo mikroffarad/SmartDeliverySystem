@@ -125,14 +125,15 @@ export const DeliveryProductsModal: React.FC<DeliveryProductsModalProps> = ({
                         )}
 
                         <div style={{ textAlign: 'right', marginTop: '20px' }}>
-                            <button
+                            <button className='cancel-button'
                                 onClick={onClose}
                                 style={{
                                     padding: '10px 20px',
                                     backgroundColor: '#6c757d',
                                     color: 'white',
                                     border: 'none',
-                                    borderRadius: '5px'
+                                    borderRadius: '5px',
+                                    cursor: 'pointer'
                                 }}
                             >
                                 Close

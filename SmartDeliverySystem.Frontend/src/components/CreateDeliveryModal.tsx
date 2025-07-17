@@ -169,6 +169,7 @@ export const CreateDeliveryModal: React.FC<CreateDeliveryModalProps> = ({
                                     ))}
                                 </select>
                                 <button
+                                    className='save-button'
                                     onClick={handleAutoSelectStore}
                                     disabled={autoSelectLoading}
                                     style={{
