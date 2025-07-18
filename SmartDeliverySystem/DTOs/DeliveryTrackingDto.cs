@@ -7,8 +7,8 @@ namespace SmartDeliverySystem.DTOs
     public class DeliveryTrackingDto
     {
         public int DeliveryId { get; set; }
-        public int VendorId { get; set; } // Додаємо ID вендора
-        public int StoreId { get; set; } // Додаємо ID магазину
+        public int VendorId { get; set; }
+        public int StoreId { get; set; }
         public string DriverId { get; set; } = string.Empty;
         public string GpsTrackerId { get; set; } = string.Empty;
         public DeliveryStatus Status { get; set; }

@@ -2,7 +2,7 @@
 using SmartDeliverySystem.DTOs;
 using SmartDeliverySystem.Models;
 using SmartDeliverySystem.Services;
-using DeliveryDto = SmartDeliverySystem.DTOs.DeliveryResponseDto;
+using AutoMapper;
 
 namespace SmartDeliverySystem.Controllers
 {
@@ -14,63 +14,37 @@ namespace SmartDeliverySystem.Controllers
         private readonly IServiceBusService _serviceBusService;
         private readonly ISignalRService _signalRService;
         private readonly ITableStorageService _tableStorageService;
+        private readonly IMapper _mapper;
         private readonly ILogger<DeliveryController> _logger;
+
+        // Static cache to store route indices
+        private static readonly Dictionary<int, int> RouteIndexCache = [];
 
         public DeliveryController(
             IDeliveryService deliveryService,
             IServiceBusService serviceBusService,
             ISignalRService signalRService,
             ITableStorageService tableStorageService,
+            IMapper mapper,
             ILogger<DeliveryController> logger)
         {
             _deliveryService = deliveryService;
             _serviceBusService = serviceBusService;
             _signalRService = signalRService;
             _tableStorageService = tableStorageService;
+            _mapper = mapper;
             _logger = logger;
         }
+
         [HttpPost("request")]
         public async Task<ActionResult<DeliveryResponseDto>> RequestDelivery([FromBody] DeliveryRequestDto request)
         {
-            _logger.LogInformation("Delivery request received from vendor {VendorId}", request.VendorId);
-            var response = await _deliveryService.CreateDeliveryAsync(request);
-
-            // Send message to Azure Service Bus
-            try
-            {
-                _logger.LogInformation("🔄 Attempting to send message to Service Bus...");
-                _logger.LogInformation("ServiceBusService is null: {IsNull}", _serviceBusService == null);
-
-                if (_serviceBusService != null)
-                {
-                    await _serviceBusService.SendDeliveryRequestAsync(new
-                    {
-                        DeliveryId = response.DeliveryId,
-                        VendorId = request.VendorId,
-                        StoreId = response.StoreId,
-                        TotalAmount = response.TotalAmount,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                    _logger.LogInformation("✅ Delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Failed to send delivery request to Service Bus: {Message}. StackTrace: {StackTrace}", ex.Message, ex.StackTrace);
-                // Continue execution even if Service Bus fails
-            }
-
-            return Ok(response);
-        }
-        [HttpPost("request-manual")]
-        public async Task<ActionResult<DeliveryResponseDto>> RequestDeliveryManual([FromBody] DeliveryRequestManualDto request)
-        {
-            _logger.LogInformation("Manual delivery request received from vendor {VendorId} to store {StoreId}",
+            _logger.LogInformation("Delivery request received from vendor {VendorId} to store {StoreId}",
                 request.VendorId, request.StoreId);
 
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("Invalid model state for manual delivery request");
+                _logger.LogWarning("Invalid model state for delivery request");
                 return BadRequest(ModelState);
             }
 
@@ -81,41 +55,18 @@ namespace SmartDeliverySystem.Controllers
 
             try
             {
-                var response = await _deliveryService.CreateDeliveryManualAsync(request);                // Send message to Azure Service Bus
-                try
-                {
-                    if (_serviceBusService != null)
-                    {
-                        await _serviceBusService.SendDeliveryRequestAsync(new
-                        {
-                            DeliveryId = response.DeliveryId,
-                            VendorId = request.VendorId,
-                            StoreId = response.StoreId,
-                            TotalAmount = response.TotalAmount,
-                            CreatedAt = DateTime.UtcNow
-                        });
-                        _logger.LogInformation("✅ Manual delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Service Bus service is not available");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "❌ Failed to send manual delivery request to Service Bus");
-                }
-
+                var response = await _deliveryService.CreateDeliveryAsync(request);
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error creating manual delivery request");
+                _logger.LogError(ex, "❌ Error creating delivery request");
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<object>> GetDelivery(int id)
+        public async Task<ActionResult<DeliveryDto>> GetDelivery(int id)
         {
             try
             {
@@ -124,34 +75,9 @@ namespace SmartDeliverySystem.Controllers
                 if (delivery == null)
                 {
                     return NotFound($"Delivery with ID {id} not found");
-                }                // Повертаємо простий об'єкт без циклічних залежностей
-                var result = new
-                {
-                    id = delivery.Id,
-                    deliveryId = delivery.Id, // Для сумісності з frontend
-                    vendorId = delivery.VendorId,
-                    storeId = delivery.StoreId,
-                    vendorName = delivery.Vendor?.Name,
-                    storeName = delivery.Store?.Name,
-                    totalAmount = delivery.TotalAmount,
-                    status = delivery.Status,
-                    createdAt = delivery.CreatedAt,
-                    deliveredAt = delivery.DeliveredAt,
-                    currentLatitude = delivery.CurrentLatitude,
-                    currentLongitude = delivery.CurrentLongitude,
-                    driverId = delivery.DriverId,
-                    gpsTrackerId = delivery.GpsTrackerId,
-                    fromLatitude = delivery.FromLatitude,
-                    fromLongitude = delivery.FromLongitude,
-                    toLatitude = delivery.ToLatitude,
-                    toLongitude = delivery.ToLongitude,
-                    storeLatitude = delivery.ToLatitude, // Додаємо для frontend
-                    storeLongitude = delivery.ToLongitude, // Додаємо для frontend
-                    vendorLatitude = delivery.FromLatitude, // Додаємо для frontend
-                    vendorLongitude = delivery.FromLongitude, // Додаємо для frontend
-                    lastLocationUpdate = delivery.LastLocationUpdate
-                };
+                }
 
+                var result = _mapper.Map<DeliveryDto>(delivery);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -161,41 +87,14 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
-        [HttpGet("active")]
-        public async Task<ActionResult<List<Delivery>>> GetActiveDeliveries()
-        {
-            var deliveries = await _deliveryService.GetActiveDeliveriesAsync();
-            return Ok(deliveries);
-        }
         [HttpGet("all")]
-        public async Task<ActionResult<List<object>>> GetAllDeliveries()
+        public async Task<ActionResult<List<DeliveryDto>>> GetAllDeliveries()
         {
             try
             {
-                var deliveries = await _deliveryService.GetAllDeliveriesAsync();                // Повертаємо простий об'єкт без циклічних залежностей
-                var enrichedDeliveries = deliveries.Select(d => new
-                {
-                    id = d.Id,
-                    deliveryId = d.Id, // Для сумісності з frontend
-                    vendorId = d.VendorId,
-                    storeId = d.StoreId,
-                    vendorName = d.Vendor?.Name ?? $"Vendor #{d.VendorId}",
-                    storeName = d.Store?.Name ?? $"Store #{d.StoreId}",
-                    status = d.Status,
-                    totalAmount = d.TotalAmount,
-                    createdAt = d.CreatedAt,
-                    deliveredAt = d.DeliveredAt,
-                    currentLatitude = d.CurrentLatitude,
-                    currentLongitude = d.CurrentLongitude,
-                    driverId = d.DriverId,
-                    gpsTrackerId = d.GpsTrackerId,
-                    storeLatitude = d.ToLatitude, // Додаємо для frontend
-                    storeLongitude = d.ToLongitude, // Додаємо для frontend
-                    vendorLatitude = d.FromLatitude, // Додаємо для frontend
-                    vendorLongitude = d.FromLongitude // Додаємо для frontend
-                }).ToList();
-
-                return Ok(enrichedDeliveries);
+                var deliveries = await _deliveryService.GetAllDeliveriesAsync();
+                var result = _mapper.Map<List<DeliveryDto>>(deliveries);
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -224,6 +123,7 @@ namespace SmartDeliverySystem.Controllers
             _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId}", dto.DriverId, id);
             return Ok();
         }
+
         [HttpPost("{id}/pay")]
         public async Task<ActionResult> ProcessPayment(int id, [FromBody] PaymentDto payment)
         {
@@ -243,29 +143,29 @@ namespace SmartDeliverySystem.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpPost("{id}/update-location")]
         public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
         {
-            _logger.LogInformation("🌍 UpdateLocation endpoint викликано для доставки {DeliveryId} з координатами {Lat}, {Lon}",
+            _logger.LogInformation("🌍 UpdateLocation endpoint called for delivery {DeliveryId} with coordinates {Lat}, {Lon}",
                 id, locationUpdate.Latitude, locationUpdate.Longitude);
 
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("❌ Невалідні дані для оновлення локації доставки {DeliveryId}", id);
+                _logger.LogWarning("❌ Invalid data for updating location for delivery {DeliveryId}", id);
                 return BadRequest(ModelState);
             }
 
-            // Перевіряємо чи доставка не завершена
             var delivery = await _deliveryService.GetDeliveryAsync(id);
             if (delivery == null)
             {
-                _logger.LogWarning("❌ Доставка {DeliveryId} не знайдена", id);
+                _logger.LogWarning("❌ Delivery {DeliveryId} is not found", id);
                 return NotFound("Delivery not found.");
             }
 
             if (delivery.Status == DeliveryStatus.Delivered || delivery.Status == DeliveryStatus.Cancelled)
             {
-                _logger.LogWarning("❌ Доставка {DeliveryId} завершена зі статусом {Status}, ігноруємо GPS оновлення",
+                _logger.LogWarning("❌ Delivery {DeliveryId} is already completed with status {Status}, ignoring GPS update",
                     id, delivery.Status);
                 return BadRequest($"Delivery is already completed with status {delivery.Status}");
             }
@@ -273,24 +173,19 @@ namespace SmartDeliverySystem.Controllers
             var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
             if (!result)
             {
-                _logger.LogWarning("❌ Не вдалося оновити локацію для доставки {DeliveryId}", id);
+                _logger.LogWarning("❌ Failed to update location for delivery {DeliveryId}", id);
                 return NotFound("Failed to update location.");
             }
 
-            _logger.LogInformation("✅ Локація успішно оновлена для доставки {DeliveryId}", id);
-
+            _logger.LogInformation("✅ Location successfully updated for delivery {DeliveryId}", id);            
+            
             // Send GPS update to Azure Service Bus for real-time processing
             try
             {
-                await _serviceBusService.SendLocationUpdateAsync(new
-                {
-                    DeliveryId = id,
-                    Latitude = locationUpdate.Latitude,
-                    Longitude = locationUpdate.Longitude,
-                    Speed = locationUpdate.Speed,
-                    Notes = locationUpdate.Notes,
-                    Timestamp = DateTime.UtcNow
-                });
+                var serviceBusMessage = _mapper.Map<LocationUpdateServiceBusDto>(locationUpdate);
+                serviceBusMessage.DeliveryId = id;
+
+                await _serviceBusService.SendLocationUpdateAsync(serviceBusMessage);
                 _logger.LogInformation("📍 GPS update sent to Azure Service Bus for delivery {DeliveryId}", id);
             }
             catch (Exception ex)
@@ -310,15 +205,6 @@ namespace SmartDeliverySystem.Controllers
             }
 
             return Ok();
-        }
-
-        [HttpGet("{id}/tracking")]
-        public async Task<ActionResult<DeliveryTrackingDto>> GetDeliveryTracking(int id)
-        {
-            var tracking = await _deliveryService.GetDeliveryTrackingAsync(id);
-            if (tracking == null)
-                return NotFound("Delivery not found.");
-            return Ok(tracking);
         }
 
         [HttpGet("tracking/active")]
@@ -342,6 +228,7 @@ namespace SmartDeliverySystem.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [HttpGet("{deliveryId}/location-history")]
         public async Task<ActionResult<List<LocationHistoryDto>>> GetLocationHistory(int deliveryId)
         {
@@ -376,62 +263,13 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
-        [HttpPost("test-movement/{deliveryId}")]
-        public async Task<ActionResult> TestMovement(int deliveryId)
-        {
-            _logger.LogInformation("🧪 Test movement endpoint викликано для доставки {DeliveryId}", deliveryId);
-
-            var delivery = await _deliveryService.GetDeliveryAsync(deliveryId);
-            if (delivery == null)
-            {
-                return NotFound("Delivery not found");
-            }
-
-            // Симулюємо рух на 0.001 градусів на північ
-            var currentLat = delivery.CurrentLatitude ?? delivery.FromLatitude ?? 0;
-            var currentLon = delivery.CurrentLongitude ?? delivery.FromLongitude ?? 0;
-
-            var newLat = currentLat + 0.001;
-            var newLon = currentLon + 0.001;
-
-            var locationUpdate = new LocationUpdateDto
-            {
-                Latitude = newLat,
-                Longitude = newLon,
-                Speed = 30,
-                Notes = "🧪 Тестове переміщення"
-            };
-
-            var result = await _deliveryService.UpdateLocationAsync(deliveryId, locationUpdate);
-            if (!result)
-            {
-                return BadRequest("Failed to update location");
-            }
-
-            // Відправляємо SignalR оновлення
-            try
-            {
-                await _signalRService.SendLocationUpdateAsync(deliveryId, newLat, newLon, "🧪 Тестове переміщення");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Помилка при відправці SignalR оновлення");
-            }
-
-            return Ok(new
-            {
-                message = "Test movement completed",
-                oldPosition = new { lat = currentLat, lon = currentLon },
-                newPosition = new { lat = newLat, lon = newLon }
-            });
-        }
         [HttpGet("{deliveryId}/route-index")]
         public ActionResult<string> GetRouteIndex(int deliveryId)
         {
             try
             {
-                // Простий підхід: зберігаємо індекс у тимчасовому кеші або базі даних
-                // Для простоти використаємо статичний Dictionary
+                // Simplified approach: store the index in a temporary cache
+                // For simplicity, we use a static Dictionary
                 if (RouteIndexCache.TryGetValue(deliveryId, out int index))
                 {
                     return Ok(index.ToString());
@@ -440,7 +278,7 @@ namespace SmartDeliverySystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Помилка при отриманні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                _logger.LogError(ex, "Error while getting route index for delivery {DeliveryId}", deliveryId);
                 return StatusCode(500);
             }
         }
@@ -451,12 +289,12 @@ namespace SmartDeliverySystem.Controllers
             try
             {
                 RouteIndexCache[deliveryId] = dto.Index;
-                _logger.LogInformation("💾 Збережено індекс маршруту {Index} для доставки {DeliveryId}", dto.Index, deliveryId);
+                _logger.LogInformation("💾 Saved route index {Index} for delivery {DeliveryId}", dto.Index, deliveryId);
                 return Ok();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Помилка при збереженні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                _logger.LogError(ex, "Error saving route index for delivery {DeliveryId}", deliveryId);
                 return StatusCode(500);
             }
         }
@@ -467,12 +305,12 @@ namespace SmartDeliverySystem.Controllers
             try
             {
                 RouteIndexCache.Remove(deliveryId);
-                _logger.LogInformation("🗑️ Очищено індекс маршруту для доставки {DeliveryId}", deliveryId);
+                _logger.LogInformation("🗑️ Cleared the route index for delivery {DeliveryId}", deliveryId);
                 return Ok();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Помилка при очищенні індексу маршруту для доставки {DeliveryId}", deliveryId);
+                _logger.LogError(ex, "Error clearing route index for delivery {DeliveryId}", deliveryId);
                 return StatusCode(500);
             }
         }
@@ -508,14 +346,6 @@ namespace SmartDeliverySystem.Controllers
                 _logger.LogError(ex, "❌ Error deleting delivery {DeliveryId}", id);
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
-        }
-
-        // Статичний кеш для збереження індексів маршрутів
-        private static readonly Dictionary<int, int> RouteIndexCache = new();
-
-        public class RouteIndexDto
-        {
-            public int Index { get; set; }
         }
     }
 }

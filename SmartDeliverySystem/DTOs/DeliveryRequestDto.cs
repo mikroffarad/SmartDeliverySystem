@@ -5,7 +5,13 @@ namespace SmartDeliverySystem.DTOs
 {
     public class DeliveryRequestDto
     {
+        [Required]
         public int VendorId { get; set; }
+
+        [Required]
+        public int StoreId { get; set; }
+
+        [Required]
         public List<ProductRequestDto> Products { get; set; } = new();
     }
 
@@ -15,15 +21,8 @@ namespace SmartDeliverySystem.DTOs
         public int Quantity { get; set; }
     }
 
-    public class DeliveryRequestManualDto
+    public class RouteIndexDto
     {
-        [Required]
-        public int VendorId { get; set; }
-
-        [Required]
-        public int StoreId { get; set; }
-
-        [Required]
-        public List<ProductRequestDto> Products { get; set; } = new();
+        public int Index { get; set; }
     }
 }

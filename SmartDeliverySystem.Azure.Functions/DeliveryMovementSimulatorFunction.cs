@@ -185,7 +185,7 @@ namespace SmartDeliverySystem.Azure.Functions
             {
                 // Використовуємо публічний OSRM API для отримання маршруту
                 // Важливо: використовуємо InvariantCulture для правильного форматування координат (крапка замість коми)
-                var url = $"http://router.project-osrm.org/route/v1/driving/{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}?overview=full&geometries=geojson";
+                var url = $"http://localhost:5000/route/v1/driving/{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}?overview=full&geometries=geojson";
 
                 _logger.LogInformation("🌐 OSRM URL: {Url}", url);
 

@@ -13,6 +13,7 @@ import {
 const API_BASE_URL = 'https://localhost:7183/api';
 
 class DeliveryApi {
+
     // Delivery endpoints
     async getActiveDeliveries(): Promise<DeliveryData[]> {
         const response = await fetch(`${API_BASE_URL}/delivery/tracking/active`);
@@ -48,8 +49,10 @@ class DeliveryApi {
             throw new Error('Failed to fetch delivery products');
         }
         return response.json();
-    } async createDeliveryRequest(request: DeliveryRequest): Promise<{ deliveryId: number; totalAmount: number }> {
-        const response = await fetch(`${API_BASE_URL}/delivery/request-manual`, {
+    }
+
+    async createDeliveryRequest(request: DeliveryRequest): Promise<{ deliveryId: number; totalAmount: number }> {
+        const response = await fetch(`${API_BASE_URL}/delivery/request`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(request)
@@ -59,7 +62,9 @@ class DeliveryApi {
             throw new Error(errorText || 'Failed to create delivery request');
         }
         return response.json();
-    } async processPayment(deliveryId: number, paymentData: PaymentData): Promise<void> {
+    }
+
+    async processPayment(deliveryId: number, paymentData: PaymentData): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/pay`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -69,7 +74,9 @@ class DeliveryApi {
             const errorText = await response.text();
             throw new Error(errorText || 'Failed to process payment');
         }
-    } async assignDriver(deliveryId: number, driverData: DriverData): Promise<void> {
+    }
+
+    async assignDriver(deliveryId: number, driverData: DriverData): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/assign-driver`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -79,7 +86,9 @@ class DeliveryApi {
             const errorText = await response.text();
             throw new Error(errorText || 'Failed to assign driver');
         }
-    } async updateDeliveryStatus(deliveryId: number, status: number): Promise<void> {
+    }
+
+    async updateDeliveryStatus(deliveryId: number, status: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -89,7 +98,9 @@ class DeliveryApi {
             const errorText = await response.text();
             throw new Error(errorText || 'Failed to update delivery status');
         }
-    } async cancelDelivery(deliveryId: number): Promise<void> {
+    }
+
+    async cancelDelivery(deliveryId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/delivery/${deliveryId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

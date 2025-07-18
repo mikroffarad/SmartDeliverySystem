@@ -7,7 +7,6 @@ namespace SmartDeliverySystem.Services
     {
         // Ensure proper type references
         Task<DeliveryResponseDto> CreateDeliveryAsync(DeliveryRequestDto request);
-        Task<DeliveryResponseDto> CreateDeliveryManualAsync(DeliveryRequestManualDto request);
         Task<Store> FindBestStoreAsync(int vendorId, List<ProductRequestDto> products);
         Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products);
         Task<Delivery?> GetDeliveryAsync(int deliveryId); // Метод для отримання доставки за ID

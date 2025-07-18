@@ -22,73 +22,7 @@ namespace SmartDeliverySystem.Services
 
         public async Task<DeliveryResponseDto> CreateDeliveryAsync(DeliveryRequestDto request)
         {
-            _logger.LogInformation("Creating new delivery for vendor {VendorId}", request.VendorId);
-
-            // Check that all products belong to the vendor
-            var productIds = request.Products.Select(p => p.ProductId).ToList();
-            var vendorProductIds = await _context.Products
-                .Where(p => p.VendorId == request.VendorId && productIds.Contains(p.Id))
-                .Select(p => p.Id)
-                .ToListAsync();
-
-            if (vendorProductIds.Count != productIds.Count)
-            {
-                _logger.LogWarning("One or more products do not belong to vendor {VendorId}", request.VendorId);
-                throw new InvalidOperationException("One or more products do not belong to the vendor.");
-            }            // Find best store
-            var bestStore = await FindBestStoreAsync(request.VendorId, request.Products);
-            if (bestStore == null)
-                throw new InvalidOperationException("No suitable store found for delivery.");
-
-            // Calculate total amount
-            var totalAmount = await CalculateTotalAmountAsync(request.Products);
-
-            // Get vendor and store coordinates
-            var vendor = await _context.Vendors.FindAsync(request.VendorId);
-            double? fromLat = vendor?.Latitude;
-            double? fromLon = vendor?.Longitude;
-            double? toLat = bestStore.Latitude;
-            double? toLon = bestStore.Longitude;
-
-            // Create delivery
-            var delivery = new Delivery
-            {
-                VendorId = request.VendorId,
-                StoreId = bestStore.Id,
-                TotalAmount = totalAmount,
-                Status = DeliveryStatus.PendingPayment, // Статус: очікується оплата
-                FromLatitude = fromLat,
-                FromLongitude = fromLon,
-                ToLatitude = toLat,
-                ToLongitude = toLon
-            };
-
-            _context.Deliveries.Add(delivery);
-            await _context.SaveChangesAsync();
-
-            // Add products to delivery
-            var deliveryProducts = request.Products.Select(p => new DeliveryProduct
-            {
-                DeliveryId = delivery.Id,
-                ProductId = p.ProductId,
-                Quantity = p.Quantity
-            }).ToList();
-
-            _context.DeliveryProducts.AddRange(deliveryProducts);
-            await _context.SaveChangesAsync();
-
-            return new DeliveryResponseDto
-            {
-                DeliveryId = delivery.Id,
-                StoreId = bestStore.Id,
-                StoreName = bestStore.Name,
-                TotalAmount = totalAmount,
-            };
-        }
-
-        public async Task<DeliveryResponseDto> CreateDeliveryManualAsync(DeliveryRequestManualDto request)
-        {
-            _logger.LogInformation("Creating manual delivery for vendor {VendorId} to store {StoreId}",
+            _logger.LogInformation("Creating delivery for vendor {VendorId} to store {StoreId}",
                 request.VendorId, request.StoreId);
 
             // Check that all products belong to the vendor

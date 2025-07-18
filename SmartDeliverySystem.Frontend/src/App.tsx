@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { MapComponent } from './components/MapComponentDebug';
+import { MapComponent } from './components/MapComponent';
 import { AddLocationModal } from './components/AddLocationModal';
 import { VendorProductsModal } from './components/VendorProductsModal';
 import { StoreInventoryModal } from './components/StoreInventoryModal';
