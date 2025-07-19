@@ -14,7 +14,9 @@ namespace SmartDeliverySystem.Mappings
                 .ForMember(dest => dest.Products, opt => opt.MapFrom(src => src.Products));
 
             // Store mappings
-            CreateMap<Store, StoreDto>().ReverseMap();            // Product mappings
+            CreateMap<Store, StoreDto>().ReverseMap();
+
+            // Product mappings
             CreateMap<Product, ProductDto>().ReverseMap();
 
             // Delivery mappings
@@ -25,7 +27,8 @@ namespace SmartDeliverySystem.Mappings
                 .ForMember(dest => dest.StoreLatitude, opt => opt.MapFrom(src => src.ToLatitude))
                 .ForMember(dest => dest.StoreLongitude, opt => opt.MapFrom(src => src.ToLongitude))
                 .ForMember(dest => dest.VendorLatitude, opt => opt.MapFrom(src => src.FromLatitude))
-                .ForMember(dest => dest.VendorLongitude, opt => opt.MapFrom(src => src.FromLongitude)); CreateMap<Delivery, DeliveryTrackingDto>()
+                .ForMember(dest => dest.VendorLongitude, opt => opt.MapFrom(src => src.FromLongitude));
+            CreateMap<Delivery, DeliveryTrackingDto>()
                 .ForMember(dest => dest.DeliveryId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.VendorLatitude, opt => opt.MapFrom(src => src.FromLatitude))
                 .ForMember(dest => dest.VendorLongitude, opt => opt.MapFrom(src => src.FromLongitude))

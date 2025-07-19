@@ -30,6 +30,7 @@ namespace SmartDeliverySystem.Controllers
             var result = _mapper.Map<List<VendorWithProductsDto>>(vendors);
             return Ok(result);
         }
+
         [HttpGet("map")]
         public async Task<ActionResult> GetVendorsForMap()
         {
@@ -46,6 +47,7 @@ namespace SmartDeliverySystem.Controllers
 
             return Ok(vendors);
         }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<VendorWithProductsDto>> GetVendor(int id)
         {
@@ -58,6 +60,7 @@ namespace SmartDeliverySystem.Controllers
             var result = _mapper.Map<VendorWithProductsDto>(vendor);
             return Ok(result);
         }
+
         [HttpPost]
         public async Task<ActionResult<Vendor>> CreateVendor([FromBody] VendorDto dto)
         {
@@ -72,6 +75,7 @@ namespace SmartDeliverySystem.Controllers
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetVendor), new { id = vendor.Id }, vendor);
         }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateVendor(int id, [FromBody] VendorDto dto)
         {
@@ -88,6 +92,7 @@ namespace SmartDeliverySystem.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteVendor(int id)
         {

@@ -29,6 +29,7 @@ namespace SmartDeliverySystem.Controllers
         {
             return Ok(await _context.Stores.ToListAsync());
         }
+
         [HttpGet("map")]
         public async Task<ActionResult> GetStoresForMap()
         {

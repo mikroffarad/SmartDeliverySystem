@@ -19,4 +19,9 @@ namespace SmartDeliverySystem.DTOs
         public string? Notes { get; set; }
         public DateTime Timestamp { get; set; }
     }
+
+    public class RouteIndexDto
+    {
+        public int Index { get; set; }
+    }
 }

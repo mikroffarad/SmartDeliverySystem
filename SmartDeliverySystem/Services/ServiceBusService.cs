@@ -14,6 +14,16 @@ namespace SmartDeliverySystem.Services
             _logger = logger;
         }
 
+        public async Task SendDeliveryRequestAsync(object message)
+        {
+            var sender = _client.CreateSender("delivery-requests");
+            var messageBody = JsonSerializer.Serialize(message);
+            var serviceBusMessage = new ServiceBusMessage(messageBody);
+
+            await sender.SendMessageAsync(serviceBusMessage);
+            _logger.LogInformation("Delivery request sent to Service Bus");
+        }
+
         public async Task SendLocationUpdateAsync(object message)
         {
             var sender = _client.CreateSender("location-updates");

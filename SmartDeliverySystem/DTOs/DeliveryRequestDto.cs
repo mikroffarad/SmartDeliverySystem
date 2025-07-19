@@ -20,9 +20,4 @@ namespace SmartDeliverySystem.DTOs
         public int ProductId { get; set; }
         public int Quantity { get; set; }
     }
-
-    public class RouteIndexDto
-    {
-        public int Index { get; set; }
-    }
 }

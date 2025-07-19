@@ -5,12 +5,12 @@ namespace SmartDeliverySystem.Models
 {
     public enum DeliveryStatus
     {
-        PendingPayment, // Очікується оплата
-        Paid,           // Оплачено
-        Assigned,       // Водій призначений
-        InTransit,      // В дорозі
-        Delivered,      // Доставлено
-        Cancelled       // Скасовано
+        PendingPayment,
+        Paid,
+        Assigned,
+        InTransit,
+        Delivered,
+        Cancelled
     }
 
     public class Delivery
@@ -48,8 +48,8 @@ namespace SmartDeliverySystem.Models
         // Navigation properties
         public virtual Vendor Vendor { get; set; } = null!;
         public virtual Store Store { get; set; } = null!;
-        public virtual ICollection<DeliveryProduct> Products { get; set; } = new List<DeliveryProduct>();
-        public virtual ICollection<DeliveryLocationHistory> LocationHistory { get; set; } = new List<DeliveryLocationHistory>();
+        public virtual ICollection<DeliveryProduct> Products { get; set; } = [];
+        public virtual ICollection<DeliveryLocationHistory> LocationHistory { get; set; } = [];
     }
 
     // New GPS tracking model

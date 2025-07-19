@@ -12,7 +12,6 @@ namespace SmartDeliverySystem.Services
         private readonly ILogger<DeliveryService> _logger;
         private readonly IMapper _mapper;
 
-
         public DeliveryService(DeliveryContext context, ILogger<DeliveryService> logger, IMapper mapper)
         {
             _context = context;
@@ -51,7 +50,9 @@ namespace SmartDeliverySystem.Services
             double? fromLat = vendor?.Latitude;
             double? fromLon = vendor?.Longitude;
             double? toLat = store.Latitude;
-            double? toLon = store.Longitude;            // Create delivery
+            double? toLon = store.Longitude;
+
+            // Create delivery
             var delivery = new Delivery
             {
                 VendorId = request.VendorId,
@@ -84,8 +85,11 @@ namespace SmartDeliverySystem.Services
                 TotalAmount = totalAmount,
             };
         }
-        public async Task<Store> FindBestStoreAsync(int vendorId, List<ProductRequestDto> products)
+
+        public async Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products)
         {
+            _logger.LogInformation("Finding best store for vendor {VendorId}", vendorId);
+
             var vendor = await _context.Vendors.FindAsync(vendorId);
             if (vendor == null)
                 throw new ArgumentException("Vendor not found");
@@ -96,12 +100,11 @@ namespace SmartDeliverySystem.Services
             if (!activeStores.Any())
                 throw new InvalidOperationException("No active stores available");
 
-            // Завантажити StoreProducts для всіх активних магазинів
+            // Load all products for active stores
             var storeProducts = await _context.Set<StoreProduct>()
                 .Where(sp => activeStores.Select(s => s.Id).Contains(sp.StoreId))
                 .ToListAsync();
 
-            // Детальна діагностика
             _logger.LogInformation("Finding best store among {StoreCount} stores for {ProductCount} products",
                 activeStores.Count, products.Count);
 
@@ -111,14 +114,14 @@ namespace SmartDeliverySystem.Services
                     product.ProductId, product.Quantity);
             }
 
-            // Критерії вибору найкращого магазину:
-            // 1. Відстань від вендора до магазину (менша відстань = кращий бал)
-            // 2. Загальна кількість товарів у магазині (менша кількість = кращий бал, навіть 0)
-            // Формула: Score = (Distance * DistanceWeight) + (TotalInventory * InventoryWeight)
-            // Магазин з найменшим балом вибирається
+            // Best store selection criteria:
+            // 1. Distance from vendor to store (less distance = better score)
+            // 2. Total inventory in store (less inventory = better score, even 0)
+            // Formula: Score = (Distance * DistanceWeight) + (TotalInventory * InventoryWeight)
+            // Store with the lowest score is selected
 
-            double distanceWeight = 1.0;     // Вага для відстані (км)
-            double inventoryWeight = 0.001;  // Вага для інвентарю (менша кількість = кращий бал)
+            double distanceWeight = 1.0;     // Weight for distance (in kms)
+            double inventoryWeight = 0.001;  // Weight for inventory (less quantity = better score)
 
             var bestStore = activeStores
                 .Select(store =>
@@ -126,13 +129,13 @@ namespace SmartDeliverySystem.Services
                     // Розрахунок відстані від вендора до магазину
                     var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude);
 
-                    // Загальна кількість усіх товарів у магазині (може бути 0)
+                    // Total quantity of all products in the store (can be 0)
                     var totalInventory = storeProducts
                         .Where(sp => sp.StoreId == store.Id)
                         .Sum(sp => sp.Quantity);
 
-                    // Комбінований бал: відстань + (кількість товарів * вага)
-                    // Менша кількість товарів = кращий бал (навіть якщо 0)
+                    // Combined score: distance + (inventory * weight)
+                    // Less inventory = better score (even 0)
                     double score = (distance * distanceWeight) + (totalInventory * inventoryWeight);
 
                     _logger.LogInformation("Store {StoreId} ({StoreName}): Distance={Distance:F2}km, Inventory={Inventory}, Score={Score:F3}",
@@ -153,25 +156,11 @@ namespace SmartDeliverySystem.Services
                                  "Total inventory: {Inventory} items, Score: {Score:F3}",
                 bestStore.Store.Name, bestStore.Distance, bestStore.TotalInventory, bestStore.Score);
 
-            return bestStore.Store;
-        }
-        public async Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products)
-        {
-            _logger.LogInformation("Finding best store for vendor {VendorId}", vendorId);
-
-            // Use existing logic from FindBestStoreAsync
-            var bestStore = await FindBestStoreAsync(vendorId, products);
-            var vendor = await _context.Vendors.FindAsync(vendorId);
-            if (vendor == null)
-                throw new InvalidOperationException("Vendor not found.");
-
-            var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, bestStore.Latitude, bestStore.Longitude);
-
             return new FindBestStoreResponseDto
             {
-                StoreId = bestStore.Id,
-                StoreName = bestStore.Name,
-                Distance = distance
+                StoreId = bestStore.Store.Id,
+                StoreName = bestStore.Store.Name,
+                Distance = bestStore.Distance
             };
         }
         public async Task<Delivery?> GetDeliveryAsync(int deliveryId)
@@ -183,15 +172,6 @@ namespace SmartDeliverySystem.Services
 
             return delivery;
         }
-        public async Task<List<Delivery>> GetActiveDeliveriesAsync()
-        {
-            return await _context.Deliveries
-                .Include(d => d.Vendor)
-                .Include(d => d.Store)
-                .Where(d => d.Status == DeliveryStatus.InTransit || d.Status == DeliveryStatus.Assigned) // Включаємо Assigned
-                .ToListAsync();
-        }
-
         public async Task<List<Delivery>> GetAllDeliveriesAsync()
         {
             return await _context.Deliveries
@@ -424,23 +404,25 @@ namespace SmartDeliverySystem.Services
             if (delivery == null)
                 return false;
             if (delivery.Status != DeliveryStatus.Paid)
-                throw new InvalidOperationException("Delivery must be paid before assigning driver");            // Assign driver details
+                throw new InvalidOperationException("Delivery must be paid before assigning driver");
+
+            // Assign driver details
             delivery.DriverId = dto.DriverId;
             delivery.GpsTrackerId = dto.GpsTrackerId;
-            delivery.Status = DeliveryStatus.InTransit; // Статус: в дорозі після призначення водія
+            delivery.Status = DeliveryStatus.InTransit;          // Status: InTransit after driver assignment
             delivery.AssignedAt = DateTime.UtcNow;
-            // Встановлюємо початкові координати GPS-трекера на координати вендора
-            delivery.CurrentLatitude = delivery.FromLatitude;
+            delivery.CurrentLatitude = delivery.FromLatitude;    // Install initial GPS coordinates from vendor
             delivery.CurrentLongitude = delivery.FromLongitude;
             delivery.LastLocationUpdate = DateTime.UtcNow;
-            // Додаємо запис у історію переміщень
+
+            // Add record to location history
             var locationHistory = new DeliveryLocationHistory
             {
                 DeliveryId = deliveryId,
                 Latitude = delivery.FromLatitude ?? 0,
                 Longitude = delivery.FromLongitude ?? 0,
                 Timestamp = DateTime.UtcNow,
-                Notes = "Початок доставки (від вендора)",
+                Notes = "Start of delivery (from vendor)",
                 Speed = 0
             };
             _context.DeliveryLocationHistory.Add(locationHistory);
@@ -457,7 +439,9 @@ namespace SmartDeliverySystem.Services
                 .FirstOrDefaultAsync(d => d.Id == deliveryId);
 
             if (delivery == null)
-                return false;            // Update current location
+                return false;
+
+            // Update current location
             delivery.CurrentLatitude = locationUpdate.Latitude;
             delivery.CurrentLongitude = locationUpdate.Longitude;
             delivery.LastLocationUpdate = DateTime.UtcNow;
@@ -523,34 +507,36 @@ namespace SmartDeliverySystem.Services
                     Notes = h.Notes,
                     Speed = h.Speed
                 })
-                .ToListAsync(); return new DeliveryTrackingDto
-                {
-                    DeliveryId = delivery.Id,
-                    VendorId = delivery.VendorId, // Додаємо ID вендора
-                    StoreId = delivery.StoreId, // Додаємо ID магазину
-                    DriverId = delivery.DriverId ?? string.Empty,
-                    GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
-                    Status = delivery.Status,
-                    CurrentLatitude = delivery.CurrentLatitude,
-                    CurrentLongitude = delivery.CurrentLongitude,
-                    LastLocationUpdate = delivery.LastLocationUpdate,
-                    FromLatitude = delivery.FromLatitude,
-                    FromLongitude = delivery.FromLongitude,
-                    ToLatitude = delivery.ToLatitude,
-                    ToLongitude = delivery.ToLongitude,
-                    VendorLatitude = delivery.FromLatitude, // Додаємо координати вендора
-                    VendorLongitude = delivery.FromLongitude, // Додаємо координати вендора
-                    StoreLatitude = delivery.ToLatitude, // Додаємо координати магазину
-                    StoreLongitude = delivery.ToLongitude, // Додаємо координати магазину
-                    LocationHistory = locationHistory
-                };
+                .ToListAsync();
+
+            return new DeliveryTrackingDto
+            {
+                DeliveryId = delivery.Id,
+                VendorId = delivery.VendorId,
+                StoreId = delivery.StoreId,
+                DriverId = delivery.DriverId ?? string.Empty,
+                GpsTrackerId = delivery.GpsTrackerId ?? string.Empty,
+                Status = delivery.Status,
+                CurrentLatitude = delivery.CurrentLatitude,
+                CurrentLongitude = delivery.CurrentLongitude,
+                LastLocationUpdate = delivery.LastLocationUpdate,
+                FromLatitude = delivery.FromLatitude,
+                FromLongitude = delivery.FromLongitude,
+                ToLatitude = delivery.ToLatitude,
+                ToLongitude = delivery.ToLongitude,
+                VendorLatitude = delivery.FromLatitude,
+                VendorLongitude = delivery.FromLongitude,
+                StoreLatitude = delivery.ToLatitude,
+                StoreLongitude = delivery.ToLongitude,
+                LocationHistory = locationHistory
+            };
         }
         public async Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync()
         {
             var activeDeliveries = await _context.Deliveries
                 .Where(d => d.Status == DeliveryStatus.Assigned ||
                            d.Status == DeliveryStatus.InTransit ||
-                           d.Status == DeliveryStatus.Paid) // Include Paid status
+                           d.Status == DeliveryStatus.Paid)
                 .ToListAsync();
 
             var trackingList = new List<DeliveryTrackingDto>();
@@ -561,6 +547,7 @@ namespace SmartDeliverySystem.Services
                 if (tracking != null)
                     trackingList.Add(tracking);
             }
+
             return trackingList;
         }
         public async Task<List<object>> GetDeliveryProductsAsync(int deliveryId)

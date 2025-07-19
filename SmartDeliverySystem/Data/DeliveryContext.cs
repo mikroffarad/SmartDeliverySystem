@@ -21,7 +21,8 @@ namespace SmartDeliverySystem.Data
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {            // Product configuration
+        {            
+            // Product configuration
             modelBuilder.Entity<Product>(entity =>
             {
                 entity.HasKey(e => e.Id);

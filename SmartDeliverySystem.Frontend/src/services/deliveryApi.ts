@@ -117,7 +117,9 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/vendors/map`);
         if (!response.ok) throw new Error('Failed to fetch vendors');
         return response.json();
-    } async createVendor(vendorData: LocationData): Promise<VendorData> {
+    }
+
+    async createVendor(vendorData: LocationData): Promise<VendorData> {
         const response = await fetch(`${API_BASE_URL}/vendors`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -128,7 +130,9 @@ class DeliveryApi {
             throw new Error(errorText || 'Failed to create vendor');
         }
         return response.json();
-    } async deleteVendor(vendorId: number): Promise<void> {
+    }
+
+    async deleteVendor(vendorId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/vendors/${vendorId}`, {
             method: 'DELETE'
         });
@@ -143,7 +147,9 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/stores/map`);
         if (!response.ok) throw new Error('Failed to fetch stores');
         return response.json();
-    } async createStore(storeData: LocationData): Promise<StoreData> {
+    }
+
+    async createStore(storeData: LocationData): Promise<StoreData> {
         const response = await fetch(`${API_BASE_URL}/stores`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -154,7 +160,9 @@ class DeliveryApi {
             throw new Error(errorText || 'Failed to create store');
         }
         return response.json();
-    } async deleteStore(storeId: number): Promise<void> {
+    }
+
+    async deleteStore(storeId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/stores/${storeId}`, {
             method: 'DELETE'
         });
@@ -168,7 +176,9 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/stores/${storeId}/inventory`);
         if (!response.ok) throw new Error('Failed to fetch store inventory');
         return response.json();
-    } async findBestStore(vendorId: number, products: { productId: number; quantity: number }[]): Promise<{
+    }
+
+    async findBestStore(vendorId: number, products: { productId: number; quantity: number }[]): Promise<{
         storeId: number;
         storeName: string;
         distance?: number;
@@ -190,7 +200,9 @@ class DeliveryApi {
         const response = await fetch(`${API_BASE_URL}/vendors/${vendorId}/products`);
         if (!response.ok) throw new Error('Failed to fetch vendor products');
         return response.json();
-    } async addProductToVendor(vendorId: number, product: Omit<ProductData, 'id' | 'vendorId'>): Promise<ProductData> {
+    }
+
+    async addProductToVendor(vendorId: number, product: Omit<ProductData, 'id' | 'vendorId'>): Promise<ProductData> {
         const response = await fetch(`${API_BASE_URL}/vendors/${vendorId}/products`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -201,7 +213,9 @@ class DeliveryApi {
             throw new Error(errorText || 'Failed to add product');
         }
         return response.json();
-    } async updateProduct(productId: number, product: Omit<ProductData, 'id'> & { vendorId: number }): Promise<ProductData> {
+    }
+
+    async updateProduct(productId: number, product: Omit<ProductData, 'id'> & { vendorId: number }): Promise<ProductData> {
         const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -224,7 +238,9 @@ class DeliveryApi {
         }
 
         return JSON.parse(text);
-    } async deleteProduct(productId: number): Promise<void> {
+    }
+
+    async deleteProduct(productId: number): Promise<void> {
         const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
             method: 'DELETE'
         });

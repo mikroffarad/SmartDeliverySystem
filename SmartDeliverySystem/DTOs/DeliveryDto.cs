@@ -5,7 +5,7 @@ namespace SmartDeliverySystem.DTOs
     public class DeliveryDto
     {
         public int Id { get; set; }
-        public int DeliveryId { get; set; } // Для сумісності з frontend
+        public int DeliveryId { get; set; }
         public int VendorId { get; set; }
         public int StoreId { get; set; }
         public string? VendorName { get; set; }
@@ -22,10 +22,10 @@ namespace SmartDeliverySystem.DTOs
         public double? FromLongitude { get; set; }
         public double? ToLatitude { get; set; }
         public double? ToLongitude { get; set; }
-        public double? StoreLatitude { get; set; } // Додаємо для frontend
-        public double? StoreLongitude { get; set; } // Додаємо для frontend
-        public double? VendorLatitude { get; set; } // Додаємо для frontend
-        public double? VendorLongitude { get; set; } // Додаємо для frontend
+        public double? StoreLatitude { get; set; }
+        public double? StoreLongitude { get; set; }
+        public double? VendorLatitude { get; set; }
+        public double? VendorLongitude { get; set; }
         public DateTime? LastLocationUpdate { get; set; }
     }
 }

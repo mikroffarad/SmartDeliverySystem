@@ -56,6 +56,24 @@ namespace SmartDeliverySystem.Controllers
             try
             {
                 var response = await _deliveryService.CreateDeliveryAsync(request);
+
+                // Send message to Azure Service Bus
+                try
+                {
+                    if (_serviceBusService != null)
+                    {
+                        await _serviceBusService.SendDeliveryRequestAsync(_mapper.Map<DeliveryRequestDto>(request));
+                        _logger.LogInformation("✅ Delivery request sent to Azure Service Bus for delivery {DeliveryId}", response.DeliveryId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Service Bus service is not available");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Failed to send manual delivery request to Service Bus");
+                }
                 return Ok(response);
             }
             catch (Exception ex)
@@ -65,16 +83,16 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<DeliveryDto>> GetDelivery(int id)
+        [HttpGet("{deliveryId}")]
+        public async Task<ActionResult<DeliveryDto>> GetDelivery(int deliveryId)
         {
             try
             {
-                var delivery = await _deliveryService.GetDeliveryAsync(id);
+                var delivery = await _deliveryService.GetDeliveryAsync(deliveryId);
 
                 if (delivery == null)
                 {
-                    return NotFound($"Delivery with ID {id} not found");
+                    return NotFound($"Delivery with ID {deliveryId} not found");
                 }
 
                 var result = _mapper.Map<DeliveryDto>(delivery);
@@ -82,7 +100,7 @@ namespace SmartDeliverySystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting delivery {DeliveryId}", id);
+                _logger.LogError(ex, "Error getting delivery {DeliveryId}", deliveryId);
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
@@ -103,10 +121,10 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
-        [HttpPut("{id}/status")]
-        public async Task<ActionResult> UpdateDeliveryStatus(int id, [FromBody] DeliveryStatus status)
+        [HttpPut("{deliveryId}/status")]
+        public async Task<ActionResult> UpdateDeliveryStatus(int deliveryId, [FromBody] DeliveryStatus status)
         {
-            var updated = await _deliveryService.UpdateDeliveryStatusAsync(id, status);
+            var updated = await _deliveryService.UpdateDeliveryStatusAsync(deliveryId, status);
 
             if (!updated)
                 return NotFound();
@@ -114,79 +132,79 @@ namespace SmartDeliverySystem.Controllers
             return Ok();
         }
 
-        [HttpPost("{id}/assign-driver")]
-        public async Task<ActionResult> AssignDriver(int id, [FromBody] AssignDriverDto dto)
+        [HttpPost("{deliveryId}/assign-driver")]
+        public async Task<ActionResult> AssignDriver(int deliveryId, [FromBody] AssignDriverDto dto)
         {
-            var updated = await _deliveryService.AssignDriverAsync(id, dto);
+            var updated = await _deliveryService.AssignDriverAsync(deliveryId, dto);
             if (!updated)
                 return NotFound();
-            _logger.LogInformation("Driver {DriverId} assigned to delivery {DeliveryId}", dto.DriverId, id);
+            _logger.LogInformation("Driver {DriverId} assigned to delivery {deliveryId}", dto.DriverId, deliveryId);
             return Ok();
         }
 
-        [HttpPost("{id}/pay")]
-        public async Task<ActionResult> ProcessPayment(int id, [FromBody] PaymentDto payment)
+        [HttpPost("{deliveryId}/pay")]
+        public async Task<ActionResult> ProcessPayment(int deliveryId, [FromBody] PaymentDto payment)
         {
             try
             {
-                var processed = await _deliveryService.ProcessPaymentAsync(id, payment);
+                var processed = await _deliveryService.ProcessPaymentAsync(deliveryId, payment);
                 if (!processed)
                     return NotFound("Delivery not found or already paid");
 
                 _logger.LogInformation("✅ Payment processed for delivery {DeliveryId}: ${Amount} via {PaymentMethod}",
-                    id, payment.Amount, payment.PaymentMethod);
+                    deliveryId, payment.Amount, payment.PaymentMethod);
                 return Ok();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error processing payment for delivery {DeliveryId}", id);
+                _logger.LogError(ex, "❌ Error processing payment for delivery {DeliveryId}", deliveryId);
                 return BadRequest(ex.Message);
             }
         }
 
-        [HttpPost("{id}/update-location")]
-        public async Task<ActionResult> UpdateLocation(int id, [FromBody] LocationUpdateDto locationUpdate)
+        [HttpPost("{deliveryId}/update-location")]
+        public async Task<ActionResult> UpdateLocation(int deliveryId, [FromBody] LocationUpdateDto locationUpdate)
         {
             _logger.LogInformation("🌍 UpdateLocation endpoint called for delivery {DeliveryId} with coordinates {Lat}, {Lon}",
-                id, locationUpdate.Latitude, locationUpdate.Longitude);
+                deliveryId, locationUpdate.Latitude, locationUpdate.Longitude);
 
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("❌ Invalid data for updating location for delivery {DeliveryId}", id);
+                _logger.LogWarning("❌ Invalid data for updating location for delivery {DeliveryId}", deliveryId);
                 return BadRequest(ModelState);
             }
 
-            var delivery = await _deliveryService.GetDeliveryAsync(id);
+            var delivery = await _deliveryService.GetDeliveryAsync(deliveryId);
             if (delivery == null)
             {
-                _logger.LogWarning("❌ Delivery {DeliveryId} is not found", id);
+                _logger.LogWarning("❌ Delivery {DeliveryId} is not found", deliveryId);
                 return NotFound("Delivery not found.");
             }
 
             if (delivery.Status == DeliveryStatus.Delivered || delivery.Status == DeliveryStatus.Cancelled)
             {
                 _logger.LogWarning("❌ Delivery {DeliveryId} is already completed with status {Status}, ignoring GPS update",
-                    id, delivery.Status);
+                    deliveryId, delivery.Status);
                 return BadRequest($"Delivery is already completed with status {delivery.Status}");
             }
 
-            var result = await _deliveryService.UpdateLocationAsync(id, locationUpdate);
+            var result = await _deliveryService.UpdateLocationAsync(deliveryId, locationUpdate);
             if (!result)
             {
-                _logger.LogWarning("❌ Failed to update location for delivery {DeliveryId}", id);
+                _logger.LogWarning("❌ Failed to update location for delivery {DeliveryId}", deliveryId);
                 return NotFound("Failed to update location.");
             }
 
-            _logger.LogInformation("✅ Location successfully updated for delivery {DeliveryId}", id);            
-            
+            _logger.LogInformation("✅ Location successfully updated for delivery {DeliveryId}", deliveryId);
+
             // Send GPS update to Azure Service Bus for real-time processing
             try
             {
                 var serviceBusMessage = _mapper.Map<LocationUpdateServiceBusDto>(locationUpdate);
-                serviceBusMessage.DeliveryId = id;
+                serviceBusMessage.DeliveryId = deliveryId;
 
                 await _serviceBusService.SendLocationUpdateAsync(serviceBusMessage);
-                _logger.LogInformation("📍 GPS update sent to Azure Service Bus for delivery {DeliveryId}", id);
+                _logger.LogInformation("📍 GPS update sent to Azure Service Bus for delivery {DeliveryId}", deliveryId);
             }
             catch (Exception ex)
             {
@@ -196,8 +214,8 @@ namespace SmartDeliverySystem.Controllers
             // Send real-time update via SignalR
             try
             {
-                await _signalRService.SendLocationUpdateAsync(id, locationUpdate.Latitude, locationUpdate.Longitude, locationUpdate.Notes);
-                _logger.LogInformation("📡 Real-time GPS update sent via SignalR for delivery {DeliveryId}", id);
+                await _signalRService.SendLocationUpdateAsync(deliveryId, locationUpdate.Latitude, locationUpdate.Longitude, locationUpdate.Notes);
+                _logger.LogInformation("📡 Real-time GPS update sent via SignalR for delivery {DeliveryId}", deliveryId);
             }
             catch (Exception ex)
             {
@@ -315,15 +333,15 @@ namespace SmartDeliverySystem.Controllers
             }
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDelivery(int id)
+        [HttpDelete("{deliveryId}")]
+        public async Task<IActionResult> DeleteDelivery(int deliveryId)
         {
             try
             {
-                var delivery = await _deliveryService.GetDeliveryAsync(id);
+                var delivery = await _deliveryService.GetDeliveryAsync(deliveryId);
                 if (delivery == null)
                 {
-                    return NotFound($"Delivery with ID {id} not found");
+                    return NotFound($"Delivery with ID {deliveryId} not found");
                 }
 
                 // Check if delivery is in progress
@@ -332,18 +350,18 @@ namespace SmartDeliverySystem.Controllers
                     return BadRequest("Cannot delete delivery that is currently in transit");
                 }
 
-                var deleted = await _deliveryService.DeleteDeliveryAsync(id);
+                var deleted = await _deliveryService.DeleteDeliveryAsync(deliveryId);
                 if (!deleted)
                 {
                     return BadRequest("Failed to delete delivery");
                 }
 
-                _logger.LogInformation("🗑️ Delivery {DeliveryId} deleted successfully", id);
+                _logger.LogInformation("🗑️ Delivery {DeliveryId} deleted successfully", deliveryId);
                 return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error deleting delivery {DeliveryId}", id);
+                _logger.LogError(ex, "❌ Error deleting delivery {DeliveryId}", deliveryId);
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }

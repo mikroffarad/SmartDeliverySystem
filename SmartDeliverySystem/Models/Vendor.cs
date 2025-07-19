@@ -15,6 +15,6 @@ namespace SmartDeliverySystem.Models
         public double Longitude { get; set; }
 
         [JsonIgnore]
-        public ICollection<Product> Products { get; set; } = new List<Product>();
+        public ICollection<Product> Products { get; set; } = [];
     }
 }
