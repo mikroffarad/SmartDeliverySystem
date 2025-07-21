@@ -52,7 +52,6 @@ namespace SmartDeliverySystem.Azure.Functions
                 if (overdueDeliveries.Any())
                 {
                     _logger.LogWarning("Found {Count} overdue deliveries", overdueDeliveries.Count);
-                    // TODO: Send notifications to administrators
                 }
 
                 // Check for deliveries with stale GPS data (no updates in 15 minutes)
@@ -63,7 +62,6 @@ namespace SmartDeliverySystem.Azure.Functions
                 if (staleGpsDeliveries.Any())
                 {
                     _logger.LogWarning("Found {Count} deliveries with stale GPS data", staleGpsDeliveries.Count);
-                    // TODO: Alert about potential GPS tracking issues
                 }
 
                 _logger.LogInformation("✅ Status check completed. Processed {Count} deliveries", deliveries.Count);

@@ -17,19 +17,18 @@ namespace SmartDeliverySystem.Azure.Functions
         [Function("ProcessDelivery")]
         public void Run([ServiceBusTrigger("delivery-requests", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
         {
-            _logger.LogInformation("🚚 Нова доставка отримана!");
+            _logger.LogInformation("🚚 New delivery received!");
             _logger.LogInformation("Message ID: {MessageId}", message.MessageId);
             _logger.LogInformation("Message Body: {Body}", message.Body.ToString());
 
             try
             {
-                // Тут можна додати логіку обробки доставки
                 var deliveryData = JsonSerializer.Deserialize<object>(message.Body.ToString());
-                _logger.LogInformation("✅ Доставка успішно оброблена!");
+                _logger.LogInformation("✅ Delivery successfully processed!");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Помилка обробки доставки");
+                _logger.LogError(ex, "❌ Delivery processing error");
                 throw;
             }
         }

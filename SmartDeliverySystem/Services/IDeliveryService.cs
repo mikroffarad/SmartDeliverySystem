@@ -5,7 +5,6 @@ namespace SmartDeliverySystem.Services
 {
     public interface IDeliveryService
     {
-        // Ensure proper type references
         Task<DeliveryResponseDto> CreateDeliveryAsync(DeliveryRequestDto request);
         Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products);
         Task<Delivery?> GetDeliveryAsync(int deliveryId);
@@ -13,7 +12,8 @@ namespace SmartDeliverySystem.Services
         Task<List<object>> GetDeliveryProductsAsync(int deliveryId);
         Task<bool> UpdateDeliveryStatusAsync(int deliveryId, DeliveryStatus status);
         Task<bool> ProcessPaymentAsync(int deliveryId, PaymentDto payment);
-        Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto); Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
+        Task<bool> AssignDriverAsync(int deliveryId, AssignDriverDto dto); 
+        Task<bool> UpdateLocationAsync(int deliveryId, LocationUpdateDto locationUpdate);
         Task<DeliveryTrackingDto?> GetDeliveryTrackingAsync(int deliveryId);
         Task<List<DeliveryTrackingDto>> GetAllActiveTrackingAsync();
         Task<bool> DeleteDeliveryAsync(int deliveryId);

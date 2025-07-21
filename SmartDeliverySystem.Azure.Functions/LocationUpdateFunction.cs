@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Azure.Messaging.ServiceBus;
 using Azure.Data.Tables;
 using System.Text.Json;
+using SmartDeliverySystem.Azure.Functions.DTOs;
 
 namespace SmartDeliverySystem.Azure.Functions
 {
@@ -20,27 +21,26 @@ namespace SmartDeliverySystem.Azure.Functions
         [Function("LocationUpdate")]
         public async Task Run([ServiceBusTrigger("location-updates", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message)
         {
-            _logger.LogInformation("📍 GPS оновлення отримано!");
+            _logger.LogInformation("📍 GPS update received!");
             _logger.LogInformation("Message ID: {MessageId}", message.MessageId);
             _logger.LogInformation("Location data: {Body}", message.Body.ToString());
 
             try
             {
-                // Десеріалізація GPS даних
                 var locationData = JsonSerializer.Deserialize<LocationUpdateMessage>(message.Body.ToString()); if (locationData != null)
                 {
                     _logger.LogInformation("🚛 Delivery {DeliveryId} at coordinates: {Lat}, {Lon}",
                         locationData.DeliveryId, locationData.Latitude, locationData.Longitude);
 
-                    // Save to Table Storage for history
+                    // Save to Table Storage for location history
                     await SaveLocationToTableStorage(locationData);
                 }
 
-                _logger.LogInformation("✅ GPS дані успішно оброблені!");
+                _logger.LogInformation("✅ GPS data successfully processed!");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Помилка обробки GPS даних");
+                _logger.LogError(ex, "❌ GPS data processing error");
                 throw;
             }
         }
@@ -70,15 +70,5 @@ namespace SmartDeliverySystem.Azure.Functions
                 _logger.LogError(ex, "❌ Failed to save GPS data to Table Storage for delivery {DeliveryId}", locationData.DeliveryId);
             }
         }
-    }
-
-    public class LocationUpdateMessage
-    {
-        public int DeliveryId { get; set; }
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public double? Speed { get; set; }
-        public string? Notes { get; set; }
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     }
 }

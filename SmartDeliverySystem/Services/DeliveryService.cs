@@ -126,7 +126,7 @@ namespace SmartDeliverySystem.Services
             var bestStore = activeStores
                 .Select(store =>
                 {
-                    // Розрахунок відстані від вендора до магазину
+                    // Calculate distance from vendor to store
                     var distance = CalculateDistance(vendor.Latitude, vendor.Longitude, store.Latitude, store.Longitude);
 
                     // Total quantity of all products in the store (can be 0)

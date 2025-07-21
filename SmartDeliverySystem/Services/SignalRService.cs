@@ -3,12 +3,6 @@ using SmartDeliverySystem.Hubs;
 
 namespace SmartDeliverySystem.Services
 {
-    public interface ISignalRService
-    {
-        Task SendLocationUpdateAsync(int deliveryId, double latitude, double longitude, string? notes = null);
-        Task SendDeliveryStatusUpdateAsync(int deliveryId, string status);
-    }
-
     public class SignalRService : ISignalRService
     {
         private readonly IHubContext<DeliveryTrackingHub> _hubContext;
@@ -23,18 +17,18 @@ namespace SmartDeliverySystem.Services
         {
             var locationData = new
             {
-                deliveryId = deliveryId,      // lowercase для JavaScript
-                latitude = latitude,
-                longitude = longitude,
-                notes = notes,
+                deliveryId,
+                latitude,
+                longitude,
+                notes,
                 timestamp = DateTime.UtcNow
             };
 
-            // Надіслати конкретній доставці
+            // Send to the specific delivery 
             await _hubContext.Clients.Group($"Delivery_{deliveryId}")
                 .SendAsync("LocationUpdated", locationData);
 
-            // Надіслати всім хто слідкує за всіма доставками
+            // Send to all clients tracking deliveries
             await _hubContext.Clients.Group("AllDeliveries")
                 .SendAsync("LocationUpdated", locationData);
 
