@@ -74,16 +74,12 @@ namespace SmartDeliverySystem.Services
                 DeliveryId = delivery.Id,
                 ProductId = p.ProductId,
                 Quantity = p.Quantity
-            }).ToList();
+            }).ToList(); _context.DeliveryProducts.AddRange(deliveryProducts);
+            await _context.SaveChangesAsync();
 
-            _context.DeliveryProducts.AddRange(deliveryProducts);
-            await _context.SaveChangesAsync(); return new DeliveryResponseDto
-            {
-                DeliveryId = delivery.Id,
-                StoreId = store.Id,
-                StoreName = store.Name,
-                TotalAmount = totalAmount,
-            };
+            var response = _mapper.Map<DeliveryResponseDto>(delivery);
+            response.StoreName = store.Name;
+            return response;
         }
 
         public async Task<FindBestStoreResponseDto> FindBestStoreForDeliveryAsync(int vendorId, List<ProductRequestDto> products)
@@ -494,20 +490,12 @@ namespace SmartDeliverySystem.Services
                 .FirstOrDefaultAsync(d => d.Id == deliveryId);
 
             if (delivery == null)
-                return null;
-
-            var locationHistory = await _context.DeliveryLocationHistory
+                return null; var locationHistoryEntities = await _context.DeliveryLocationHistory
                 .Where(h => h.DeliveryId == deliveryId)
                 .OrderBy(h => h.Timestamp)
-                .Select(h => new LocationHistoryDto
-                {
-                    Latitude = h.Latitude,
-                    Longitude = h.Longitude,
-                    Timestamp = h.Timestamp,
-                    Notes = h.Notes,
-                    Speed = h.Speed
-                })
                 .ToListAsync();
+
+            var locationHistory = _mapper.Map<List<LocationHistoryDto>>(locationHistoryEntities);
 
             return new DeliveryTrackingDto
             {
@@ -570,7 +558,6 @@ namespace SmartDeliverySystem.Services
                     _logger.LogWarning("No products found for delivery {DeliveryId}", deliveryId);
                     return new List<object>();
                 }
-
                 return delivery.Products.Select(dp => new
                 {
                     id = dp.Product.Id,

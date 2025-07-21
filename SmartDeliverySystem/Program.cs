@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddAutoMapper(typeof(SmartDeliverySystem.Mappings.MappingProfile));
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

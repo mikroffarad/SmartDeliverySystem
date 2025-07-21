@@ -34,11 +34,15 @@ namespace SmartDeliverySystem.Mappings
                 .ForMember(dest => dest.VendorLongitude, opt => opt.MapFrom(src => src.FromLongitude))
                 .ForMember(dest => dest.StoreLatitude, opt => opt.MapFrom(src => src.ToLatitude))
                 .ForMember(dest => dest.StoreLongitude, opt => opt.MapFrom(src => src.ToLongitude));
+            CreateMap<Delivery, DeliveryResponseDto>()
+                .ForMember(dest => dest.DeliveryId, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.StoreName, opt => opt.Ignore()); // Will be set manually
 
             // Location update mappings
             CreateMap<LocationUpdateDto, LocationUpdateServiceBusDto>()
                 .ForMember(dest => dest.Timestamp, opt => opt.MapFrom(src => DateTime.UtcNow))
-                .ForMember(dest => dest.DeliveryId, opt => opt.Ignore());
+                .ForMember(dest => dest.DeliveryId, opt => opt.Ignore());            // Location history mappings
+            CreateMap<DeliveryLocationHistory, LocationHistoryDto>();
         }
     }
 }
