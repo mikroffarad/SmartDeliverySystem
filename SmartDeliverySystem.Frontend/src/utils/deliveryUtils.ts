@@ -1,4 +1,4 @@
-// Утиліта для конвертації статусів доставки
+// Utility for converting delivery statuses
 export const getStatusText = (status: number | string): string => {
     if (typeof status === 'string') return status;
 
@@ -13,7 +13,7 @@ export const getStatusText = (status: number | string): string => {
     }
 };
 
-// Утиліта для отримання кольору статусу
+// Utility for getting status color
 export const getStatusColor = (status: number | string): string => {
     const statusText = getStatusText(status);
 

@@ -81,7 +81,9 @@ const AppContent: React.FC = () => {
             console.error("SignalR Error:", error);
             setConnectionStatus('error');
         }
-    };    // Функція для конвертації числових статусів в текстові
+    };
+
+    // Function for converting numeric statuses to text
     const getStatusText = (status: number | string) => {
         if (typeof status === 'string') return status;
 
@@ -104,7 +106,7 @@ const AppContent: React.FC = () => {
 
             const deliveryMap: Record<string, DeliveryData> = {}; deliveries.forEach(delivery => {
                 console.log(`📦 Processing delivery ${delivery.deliveryId}, status: ${delivery.status}`);
-                // Показуємо доставки зі статусом Assigned (2) і InTransit (3)
+                // Showing deliveries with status Assigned (2) and InTransit (3)
                 if (delivery.status === 2 || delivery.status === 3) {
                     deliveryMap[delivery.deliveryId.toString()] = delivery;
                     console.log(`📦 Added delivery ${delivery.deliveryId} to map`);
@@ -144,19 +146,21 @@ const AppContent: React.FC = () => {
                     return updated;
                 } else {
                     console.log('📍 Delivery not found in current data - trying to fetch from API...');
-                    // Спробуємо додати доставку, якщо її немає
+                    // Try to add delivery if it is not available.
                     loadDeliveryById(data.deliveryId);
                     return prev;
                 }
             });
         }, 100); // 100ms throttle
-    }; const loadDeliveryById = async (deliveryId: number) => {
+    };
+
+    const loadDeliveryById = async (deliveryId: number) => {
         try {
             console.log(`📦 Loading delivery ${deliveryId} from API...`);
             const delivery = await deliveryApi.getDeliveryById(deliveryId);
             console.log(`📦 Received delivery ${deliveryId}:`, delivery);
 
-            // Перевіряємо чи доставка має статус Assigned (2) або InTransit (3)
+            // Check whether the delivery has the status Assigned (2) or InTransit (3)
             if (delivery && (delivery.status === 2 || delivery.status === 3)) {
                 setDeliveryData(prev => ({
                     ...prev,
@@ -169,11 +173,13 @@ const AppContent: React.FC = () => {
         } catch (error) {
             console.error(`Error loading delivery ${deliveryId}:`, error);
         }
-    }; const updateDeliveryStatus = (data: any) => {
+    };
+
+    const updateDeliveryStatus = (data: any) => {
         const deliveryId = data.deliveryId.toString();
 
         if (data.status === 4 || data.status === 5 || data.status === 'Delivered' || data.status === 'Cancelled') {
-            // Видаляємо завершені доставки з активних
+            // Delete completed deliveries from active ones
             setDeliveryData(prev => {
                 const newData = { ...prev };
                 delete newData[deliveryId];
@@ -181,7 +187,7 @@ const AppContent: React.FC = () => {
                 return newData;
             });
         } else if (data.status === 2 || data.status === 3) {
-            // Додаємо або оновлюємо активні доставки
+            // Add or update active deliveries
             setDeliveryData(prev => {
                 if (prev[deliveryId]) {
                     return {
@@ -192,13 +198,15 @@ const AppContent: React.FC = () => {
                         }
                     };
                 } else {
-                    // Якщо доставки немає, спробуємо її завантажити
+                    // If there is no delivery, it will try to download it
                     loadDeliveryById(data.deliveryId);
                     return prev;
                 }
             });
         }
-    }; const handleAddVendor = () => {
+    };
+
+    const handleAddVendor = () => {
         console.log('🏭 Add Vendor button clicked');
         setAddingType('vendor');
         setIsAddingMode(true);
@@ -210,7 +218,9 @@ const AppContent: React.FC = () => {
         setAddingType('store');
         setIsAddingMode(true);
         console.log('🏪 Set addingType to store, isAddingMode to true');
-    }; const handleLocationSelect = (lat: number, lng: number) => {
+    };
+
+    const handleLocationSelect = (lat: number, lng: number) => {
         console.log('🎯 handleLocationSelect called with:', lat, lng);
         console.log('🎯 isAddingMode:', isAddingMode, 'addingType:', addingType);
 
@@ -222,7 +232,9 @@ const AppContent: React.FC = () => {
         } else {
             console.log('🎯 Not in adding mode or no adding type');
         }
-    }; const handleSaveLocation = async (locationData: LocationData) => {
+    };
+
+    const handleSaveLocation = async (locationData: LocationData) => {
         try {
             if (addingType === 'vendor') {
                 await deliveryApi.createVendor(locationData);
@@ -239,22 +251,30 @@ const AppContent: React.FC = () => {
             console.error('Error saving location:', error);
             showError('Error saving location. Please try again.');
         }
-    }; const handleCancelAdd = () => {
+    };
+
+    const handleCancelAdd = () => {
         setShowAddModal(false);
         setAddingType(null);
         setSelectedLocation(null);
         setIsAddingMode(false);
-    }; const handleShowVendorProducts = (vendorId: number) => {
+    };
+
+    const handleShowVendorProducts = (vendorId: number) => {
         console.log('Show vendor products:', vendorId);
         setCurrentVendorId(vendorId);
         setShowProductsModal(true);
-    }; const handleShowStoreInventory = (storeId: number, storeName?: string) => {
+    };
+
+    const handleShowStoreInventory = (storeId: number, storeName?: string) => {
         console.log('Show store inventory:', storeId, storeName);
         setCurrentStoreId(storeId);
         setCurrentStoreName(storeName || `Store #${storeId}`);
         setShowInventoryModal(true);
-    }; const handleCreateDelivery = (vendorId: number) => {
-        // Знаходимо назву вендора
+    };
+
+    const handleCreateDelivery = (vendorId: number) => {
+        // Find the vendor name
         const vendorElement = document.querySelector(`[data-vendor-id="${vendorId}"]`);
         const vendorName = vendorElement?.getAttribute('data-vendor-name') || `Vendor #${vendorId}`;
 
@@ -273,7 +293,9 @@ const AppContent: React.FC = () => {
     const handlePaymentProcessed = (deliveryId: number) => {
         setShowPaymentModal(false);
         setShowDriverModal(true);
-    }; const handleDriverAssigned = () => {
+    };
+
+    const handleDriverAssigned = () => {
         setShowDriverModal(false);
         setCurrentDeliveryId(null);
         setCurrentTotalAmount(0);
@@ -295,7 +317,9 @@ const AppContent: React.FC = () => {
             console.error('Error cancelling delivery:', error);
             showError('Error cancelling delivery. Please try again.');
         }
-    }; const handleDeliveryArrived = (deliveryId: string) => {
+    };
+
+    const handleDeliveryArrived = (deliveryId: string) => {
         console.log(`🎯 Delivery ${deliveryId} arrived - removing from state`);
         setDeliveryData(prev => {
             const updated = { ...prev };
@@ -304,53 +328,24 @@ const AppContent: React.FC = () => {
         });
     };
 
-    const testArrival = async (deliveryId: number) => {
-        // Тестова функція для симуляції прибуття
-        console.log(`🧪 Testing arrival for delivery ${deliveryId}`);
-
-        const deliveryIdStr = String(deliveryId);
-        if (deliveryData[deliveryIdStr]) {
-            const delivery = deliveryData[deliveryIdStr];
-
-            // Симулюємо оновлення позиції до координат магазину
-            setDeliveryData(prev => ({
-                ...prev,
-                [deliveryIdStr]: {
-                    ...delivery,
-                    currentLatitude: delivery.storeLatitude,
-                    currentLongitude: delivery.storeLongitude,
-                    lastLocationUpdate: new Date().toISOString()
-                }
-            }));
-
-            // Через 2 секунди змінюємо статус на Delivered
-            setTimeout(() => {
-                setDeliveryData(prev => {
-                    const updated = { ...prev };
-                    delete updated[deliveryIdStr];
-                    return updated;
-                });
-            }, 5000);
-        }
-    };
-
-    // Глобальна функція для тестування
-    (window as any).testArrival = testArrival;
-
     return (
         <div className="app">
-            {/* Map */}            <div id="map">                <MapComponent
-                onLocationSelect={handleLocationSelect}
-                deliveries={deliveryData}
-                onShowVendorProducts={handleShowVendorProducts}
-                onShowStoreInventory={handleShowStoreInventory}
-                onCreateDelivery={handleCreateDelivery}
-                onDeliveryArrived={handleDeliveryArrived}
-                isAddingMode={isAddingMode}
-                addingType={addingType}
-                refreshTrigger={refreshTrigger}
-            />
-            </div>{/* Control buttons */}
+            {/* Map */}
+            <div id="map">
+                <MapComponent
+                    onLocationSelect={handleLocationSelect}
+                    deliveries={deliveryData}
+                    onShowVendorProducts={handleShowVendorProducts}
+                    onShowStoreInventory={handleShowStoreInventory}
+                    onCreateDelivery={handleCreateDelivery}
+                    onDeliveryArrived={handleDeliveryArrived}
+                    isAddingMode={isAddingMode}
+                    addingType={addingType}
+                    refreshTrigger={refreshTrigger}
+                />
+            </div>
+
+            {/* Control buttons */}
             <div className="control-buttons">
                 <button onClick={handleAddVendor}>
                     🏭 {isAddingMode && addingType === 'vendor' ? 'Click on map to add vendor' : 'Add Vendor'}
@@ -366,7 +361,9 @@ const AppContent: React.FC = () => {
                         ❌ Cancel
                     </button>
                 )}
-            </div>            {/* Delivery info panel */}
+            </div>
+
+            {/* Delivery info panel */}
             <div className="delivery-info">
 
                 <div className={`connection-status ${connectionStatus}`}>
@@ -427,13 +424,17 @@ const AppContent: React.FC = () => {
                         ))}
                     </div>
                 )}
-            </div><AddLocationModal
+            </div>
+
+            <AddLocationModal
                 isOpen={showAddModal}
                 addingType={addingType}
                 selectedLocation={selectedLocation}
                 onSave={handleSaveLocation}
                 onCancel={handleCancelAdd}
-            />            <VendorProductsModal
+            />
+
+            <VendorProductsModal
                 isOpen={showProductsModal}
                 vendorId={currentVendorId}
                 onClose={() => {
@@ -489,7 +490,9 @@ const AppContent: React.FC = () => {
                     setSelectedDeliveryId(deliveryId);
                     setShowDeliveryProductsModal(true);
                 }}
-            />            {/* Delivery Products Modal */}
+            />
+
+            {/* Delivery Products Modal */}
             <DeliveryProductsModal
                 isOpen={showDeliveryProductsModal}
                 deliveryId={selectedDeliveryId}

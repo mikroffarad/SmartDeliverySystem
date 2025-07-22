@@ -1,8 +1,8 @@
 # Smart Delivery System - Frontend
 
-## Інструкція по запуску
+## Getting Started
 
-У папці `SmartDeliverySystem.Frontend` потрібно встановити залежності та запустити проєкт:
+In the `SmartDeliverySystem.Frontend` folder, you need to install dependencies and run the project:
 
 ```bash
 cd SmartDeliverySystem.Frontend
@@ -10,33 +10,33 @@ npm install
 npm run dev
 ```
 
-## Поточний стан
-Проєкт налаштовано з:
+## Current Status
+The project is configured with:
 - ✅ Vite + React + TypeScript
-- ✅ Структура компонентів
-- ✅ TypeScript типи
-- ✅ API сервіси
-- ✅ CSS стилі
+- ✅ Component structure
+- ✅ TypeScript types
+- ✅ API services
+- ✅ CSS styles
 
-## Що потрібно зробити
-1. Встановити залежності: `npm install`
-2. Запустити: `npm run dev`
-3. Відкрити: http://localhost:3000
+## What to do
+1. Install dependencies: `npm install`
+2. Run: `npm run dev`
+3. Open: http://localhost:3000
 
-Після встановлення пакетів React буде працювати коректно.
+After installing packages, React will work correctly.
 
-## Структура проєкту
+## Project Structure
 ```
 SmartDeliverySystem.Frontend/
 ├── src/
-│   ├── components/     # React компоненти
-│   ├── services/       # API сервіси
-│   ├── types/          # TypeScript типи
-│   ├── App.tsx         # Головний компонент
-│   └── main.tsx        # Точка входу
+│   ├── components/     # React components
+│   ├── services/       # API services
+│   ├── types/          # TypeScript types
+│   ├── App.tsx         # Main component
+│   └── main.tsx        # Entry point
 ├── package.json
 ├── tsconfig.json
 └── vite.config.ts
 ```
 
-Після встановлення пакетів ви побачите повноцінний React додаток з інтерфейсом системи доставки.
+After installing packages, you will see a full-featured React application with a delivery system interface.

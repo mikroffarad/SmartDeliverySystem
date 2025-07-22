@@ -21,7 +21,7 @@ interface MapComponentProps {
     onShowVendorProducts?: (vendorId: number) => void;
     onShowStoreInventory?: (storeId: number, storeName?: string) => void;
     onCreateDelivery?: (vendorId: number) => void;
-    onDeliveryArrived?: (deliveryId: string) => void; // Новий колбек для прибуття
+    onDeliveryArrived?: (deliveryId: string) => void;
     isAddingMode?: boolean;
     addingType?: 'vendor' | 'store' | null;
     refreshTrigger?: number;
@@ -46,7 +46,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
     const deliveryMarkersRef = useRef<Record<string, L.Marker>>({});
     const deliveryRoutesRef = useRef<Record<string, L.Polyline>>({});
-    const arrivedDeliveriesRef = useRef<Set<string>>(new Set()); // Флаг для прибулих доставок
+    const arrivedDeliveriesRef = useRef<Set<string>>(new Set()); // Flag for arrived deliveries
     const vendorMarkersRef = useRef<L.Marker[]>([]);
     const storeMarkersRef = useRef<L.Marker[]>([]);    // Create truck icon factory - memoized to prevent recreation
     const createTruckIcon = useCallback(() => {
@@ -64,7 +64,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             console.error('❌ Error creating truck icon:', error);
             return new L.Icon.Default();
         }
-    }, []);    // Get route from OSRM API
+    }, []);
+
+    // Get route from OSRM API
     const getRouteFromOSRM = useCallback(async (fromLat: number, fromLon: number, toLat: number, toLon: number) => {
         try {
             console.log('🗺️ Getting route from OSRM API');
@@ -96,7 +98,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             console.error('❌ Error getting route from OSRM:', error);
             return null;
         }
-    }, []);    // Create or update delivery route
+    }, []);
+
+    // Create or update delivery route
     const updateDeliveryRoute = useCallback(async (deliveryId: string, delivery: DeliveryData) => {
         if (!mapRef.current) return;
 
@@ -160,7 +164,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             deliveryRoutesRef.current[deliveryId] = straightLine;
             console.log('⚠️ Fallback straight line created for delivery', deliveryId);
         }
-    }, [vendors, stores, getRouteFromOSRM]);// Initialize map only once
+    }, [vendors, stores, getRouteFromOSRM]);
+
+    // Initialize map only once
     useEffect(() => {
         console.log('🗺️ Map initialization useEffect called');
         console.log('🗺️ mapContainer.current:', mapContainer.current);
@@ -211,6 +217,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
         };
     }, [onLocationSelect]);    // Load vendors and stores
+
     const loadVendorsAndStores = async () => {
         try {
             console.log('🔄 Loading vendors and stores...');
@@ -240,11 +247,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             const container = mapRef.current.getContainer();
             container.style.cursor = isAddingMode ? 'crosshair' : '';
         }
-    }, [isAddingMode]);
+    }, [isAddingMode]);    // Handle vendors - only recreate when vendors data actually changes
 
-    // Handle vendors
+    const vendorsKey = useMemo(() => {
+        return vendors.map(v => `${v.id}:${v.name}:${v.latitude}:${v.longitude}`).sort().join('|');
+    }, [vendors]);
+
     useEffect(() => {
         if (!mapRef.current) return;
+
+        console.log('🏭 Updating vendor markers...');
 
         // Clear existing vendor markers
         vendorMarkersRef.current.forEach(marker => {
@@ -286,6 +298,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
         });
 
+        console.log('🏭 Vendor markers updated, total:', vendorMarkersRef.current.length);
+    }, [vendorsKey]); // Use memoized key instead of vendors array
+
+    // Set up vendor window functions only once
+    useEffect(() => {
         (window as any).showVendorProducts = (vendorId: number) => {
             if (onShowVendorProducts) onShowVendorProducts(vendorId);
         };
@@ -313,11 +330,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 showError(`Error deleting vendor: ${errorMessage}`);
             }
         };
-    }, [vendors, onShowVendorProducts, onCreateDelivery]);
+    }, [onShowVendorProducts, onCreateDelivery, showConfirmation, showSuccess, showError, loadVendorsAndStores]);
+    // Handle stores - only recreate when stores data actually changes
+    const storesKey = useMemo(() => {
+        return stores.map(s => `${s.id}:${s.name}:${s.latitude}:${s.longitude}`).sort().join('|');
+    }, [stores]);
 
-    // Handle stores
     useEffect(() => {
         if (!mapRef.current) return;
+
+        console.log('🏪 Updating store markers...');
 
         // Clear existing store markers
         storeMarkersRef.current.forEach(marker => {
@@ -355,6 +377,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
         });
 
+        console.log('🏪 Store markers updated, total:', storeMarkersRef.current.length);
+    }, [storesKey]); // Use memoized key instead of stores array
+
+    // Set up store window functions only once
+    useEffect(() => {
         (window as any).showStoreInventory = (storeId: number, storeName?: string) => {
             if (onShowStoreInventory) onShowStoreInventory(storeId, storeName);
         }; (window as any).deleteStore = async (storeId: number) => {
@@ -379,10 +406,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 showError(`Error deleting store: ${errorMessage}`);
             }
         };
-    }, [stores, onShowStoreInventory]);    // Memoize delivery keys for comparison with coordinates
+    }, [onShowStoreInventory, showConfirmation, showSuccess, showError, loadVendorsAndStores]);
+    // Memoize delivery keys for comparison with coordinates and status
     const deliveryKeys = useMemo(() => {
         return Object.entries(deliveries)
-            .map(([id, delivery]) => `${id}:${delivery.currentLatitude}:${delivery.currentLongitude}`)
+            .map(([id, delivery]) => `${id}:${delivery.currentLatitude}:${delivery.currentLongitude}:${delivery.status}`)
             .sort()
             .join(',');
     }, [deliveries]);// Handle delivery markers with ULTRA DETAILED LOGGING
@@ -424,7 +452,6 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
                     const latDiff = Math.abs(delivery.storeLatitude - delivery.currentLatitude);
                     const lngDiff = Math.abs(delivery.storeLongitude - delivery.currentLongitude);
-
                     // Check arrival conditions with enhanced logging
                     const isAtDestination = latDiff < 0.0005 && lngDiff < 0.0005; // Збільшено поріг
                     const isDelivered = delivery.status === 4 || delivery.status === 'Delivered';
@@ -436,8 +463,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             latDiff,
                             lngDiff,
                             status: delivery.status,
-                            lastUpdate: delivery.lastLocationUpdate
-                        });                    // СПРОЩЕНА УМОВА: якщо вантажівка на місці призначення - показуємо прибуття
+                            lastUpdate: String(delivery.lastLocationUpdate)
+                        }); // SIMPLIFIED CONDITION: if truck is at destination - show arrival
+
                     if (isAtDestination && !arrivedDeliveriesRef.current.has(deliveryId)) {
                         console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);
 
@@ -445,10 +473,10 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         arrivedDeliveriesRef.current.add(deliveryId);
                         console.log(`🏁 Marked delivery ${deliveryId} as arrived`);
 
-                        // Автоматично оновлюємо статус доставки на "Delivered"
+                        // Automatically update delivery status to "Delivered"
                         try {
                             console.log(`🔄 Updating delivery ${deliveryId} status to Delivered`);
-                            // Викликаємо API для оновлення статусу
+                            // Call API to update status
                             fetch(`https://localhost:7183/api/delivery/${deliveryId}/status`, {
                                 method: 'PUT',
                                 headers: {
@@ -464,7 +492,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             });
                         } catch (error) {
                             console.error(`❌ Error updating delivery ${deliveryId} status:`, error);
-                        }                        // Show arrival notification and keep truck visible for 2 seconds
+                        }
+                        // Show arrival notification and keep truck visible for 2 seconds
                         existingMarker.getPopup()?.setContent(`
                             <div style="text-align: center; padding: 10px;">
                                 <b>🚛 Delivery #${deliveryId}</b><br>
@@ -482,7 +511,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                         // Notify parent component about arrival
                         if (onDeliveryArrived) {
                             onDeliveryArrived(deliveryId);
-                        }                        // Remove truck and route after exactly 5 seconds to give user time to see arrival
+                        }
+
+                        // Remove truck and route after exactly 5 seconds to give user time to see arrival
                         setTimeout(() => {
                             console.log(`🗑️ Removing delivery ${deliveryId} after arrival display`);
 
@@ -516,10 +547,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                                         console.log(`🛣️ ✅ Force removed polyline`);
                                     }
                                 }
-                            }); if (removedCount > 0) {
+                            });
+
+                            if (removedCount > 0) {
                                 console.log(`🛣️ ✅ Force removed ${removedCount} additional polylines`);
                             }
-                        }, 3000); // 5 секунд для синхронізації з бекендом
+                        }, 3000); // 5 seconds for backend sync
 
                         return; // Don't continue with normal update
                     }
@@ -534,7 +567,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     console.log(`🚛 ✅ Successfully updated position for delivery ${deliveryId}`);
                 } catch (error) {
                     console.error(`🚛 ❌ Error updating position for delivery ${deliveryId}:`, error);
-                }                // Update popup with current time
+                }
+
+                // Update popup with current time
                 try {
                     existingMarker.getPopup()?.setContent(`
                         <div>
@@ -620,7 +655,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
         }); console.log('🚛 === END DELIVERY MARKERS UPDATE ===');
 
-    }, [deliveryKeys, createTruckIcon, updateDeliveryRoute]);// Глобальна функція для очищення всіх маршрутів (для тестування)
+    }, [deliveryKeys, createTruckIcon, updateDeliveryRoute]);
+
+    // Global function to clear all routes and markers
     (window as any).clearAllRoutes = () => {
         console.log('🧹 Clearing all routes manually');
         if (mapRef.current) {

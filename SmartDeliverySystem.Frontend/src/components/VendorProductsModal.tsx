@@ -31,7 +31,7 @@ export const VendorProductsModal: React.FC<VendorProductsModalProps> = ({
         price: 0
     });
 
-    // Попередньо визначені категорії
+    // Predefined categories for products
     const predefinedCategories = [
         'Bakery',
         'Dairy',

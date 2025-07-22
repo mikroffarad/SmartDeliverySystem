@@ -53,7 +53,9 @@ namespace SmartDeliverySystem.Tests.Controllers
             await Context.SaveChangesAsync();
 
             // Act
-            var result = await _controller.GetVendor(vendor.Id);            // Assert
+            var result = await _controller.GetVendor(vendor.Id);            
+            
+            // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var returnedVendor = Assert.IsType<VendorWithProductsDto>(okResult.Value);
             Assert.Equal(vendor.Name, returnedVendor.Name);
@@ -69,6 +71,7 @@ namespace SmartDeliverySystem.Tests.Controllers
             // Assert
             Assert.IsType<NotFoundResult>(result.Result);
         }
+
         [Fact]
         public async Task CreateVendor_ValidVendor_ReturnsCreatedResult()
         {
@@ -93,6 +96,7 @@ namespace SmartDeliverySystem.Tests.Controllers
             Assert.NotNull(savedVendor);
             Assert.Equal(vendorDto.Name, savedVendor.Name);
         }
+
         [Fact]
         public async Task CreateVendor_DuplicateName_ReturnsBadRequest()
         {
@@ -201,7 +205,9 @@ namespace SmartDeliverySystem.Tests.Controllers
             await Context.SaveChangesAsync();
 
             // Act
-            var result = await _controller.DeleteVendor(vendor.Id);            // Assert
+            var result = await _controller.DeleteVendor(vendor.Id);            
+            
+            // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
             Assert.Contains("has associated products", badRequestResult.Value?.ToString() ?? "");
         }

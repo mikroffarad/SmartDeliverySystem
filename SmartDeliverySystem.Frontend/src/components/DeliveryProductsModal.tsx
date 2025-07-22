@@ -36,11 +36,11 @@ export const DeliveryProductsModal: React.FC<DeliveryProductsModalProps> = ({
 
         setLoading(true);
         try {
-            // Завантажуємо інформацію про доставку
+            // Load delivery information
             const delivery = await deliveryApi.getDeliveryById(deliveryId);
             setDeliveryInfo(delivery);
 
-            // Завантажуємо продукти доставки
+            // Load delivery products
             const deliveryProducts = await deliveryApi.getDeliveryProducts(deliveryId);
             setProducts(deliveryProducts);
         } catch (error) {

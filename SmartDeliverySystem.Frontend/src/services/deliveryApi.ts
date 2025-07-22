@@ -226,12 +226,12 @@ class DeliveryApi {
             throw new Error(errorText || 'Failed to update product');
         }
 
-        // Якщо відповідь порожня (204 No Content), повертаємо оновлений продукт
+        // If the response is empty (204 No Content), we return the product with its ID
         if (response.status === 204 || response.headers.get('content-length') === '0') {
             return { id: productId, ...product } as ProductData;
         }
 
-        // Перевіряємо, чи є контент для парсингу
+        // Check if there is content to parse
         const text = await response.text();
         if (!text) {
             return { id: productId, ...product } as ProductData;

@@ -43,7 +43,7 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
     const getStatusText = (status: number | string) => {
         if (typeof status === 'string') return status;
 
-        // Конвертуємо числовий статус в текстовий відповідно до enum
+        // Convert numeric status to text according to enum
         switch (status) {
             case 0: return 'PendingPayment';
             case 1: return 'Paid';
@@ -58,10 +58,10 @@ export const AllDeliveriesModal: React.FC<AllDeliveriesModalProps> = ({
     const loadAllDeliveries = async () => {
         setLoading(true);
         try {
-            // Завантажуємо всі доставки (не тільки активні)
+            // Load all deliveries (not just active ones)
             const allDeliveries = await deliveryApi.getAllDeliveries();
 
-            // Форматуємо дані для відображення
+            // Format data for display
             const formattedDeliveries = allDeliveries.map((delivery: any) => ({
                 id: delivery.id || delivery.deliveryId,
                 deliveryId: delivery.id || delivery.deliveryId,
