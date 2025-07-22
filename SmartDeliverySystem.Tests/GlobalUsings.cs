@@ -1,0 +1,9 @@
+global using Xunit;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Logging;
+global using AutoMapper;
+global using SmartDeliverySystem.Data;
+global using SmartDeliverySystem.Mappings;
+global using SmartDeliverySystem.Models;
+global using SmartDeliverySystem.DTOs;
+global using Moq;
