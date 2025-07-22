@@ -48,7 +48,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     const deliveryRoutesRef = useRef<Record<string, L.Polyline>>({});
     const arrivedDeliveriesRef = useRef<Set<string>>(new Set()); // Flag for arrived deliveries
     const vendorMarkersRef = useRef<L.Marker[]>([]);
-    const storeMarkersRef = useRef<L.Marker[]>([]);    // Create truck icon factory - memoized to prevent recreation
+    const storeMarkersRef = useRef<L.Marker[]>([]); // Create truck icon factory - memoized to prevent recreation
     const createTruckIcon = useCallback(() => {
         console.log('🏗️ Creating truck icon');
         try {
@@ -135,22 +135,22 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         const routePoints = await getRouteFromOSRM(
             vendor.latitude, vendor.longitude,
             store.latitude, store.longitude
-        );
-
-        if (routePoints) {
-            // Create polyline for the route
+        ); if (routePoints) {
+            // Create polyline for the route with unique identifier
             const route = L.polyline(routePoints, {
                 color: '#007bff',
                 weight: 4,
                 opacity: 0.7,
-                dashArray: '5, 5' // Dashed line to distinguish from other lines
+                dashArray: '5, 5', // Dashed line to distinguish from other lines
+                // Add custom property to identify this specific delivery
+                className: `delivery-route-${deliveryId}`
             }).addTo(mapRef.current);
 
             // Add route to ref
             deliveryRoutesRef.current[deliveryId] = route;
             console.log('✅ Route created for delivery', deliveryId);
         } else {
-            // Fallback: create simple straight line
+            // Fallback: create simple straight line with unique identifier
             const straightLine = L.polyline([
                 [vendor.latitude, vendor.longitude],
                 [store.latitude, store.longitude]
@@ -158,7 +158,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 color: '#dc3545',
                 weight: 2,
                 opacity: 0.5,
-                dashArray: '10, 10'
+                dashArray: '10, 10',
+                // Add custom property to identify this specific delivery
+                className: `delivery-route-${deliveryId}`
             }).addTo(mapRef.current);
 
             deliveryRoutesRef.current[deliveryId] = straightLine;
@@ -216,8 +218,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 mapRef.current.off('click', handleMapClick);
             }
         };
-    }, [onLocationSelect]);    // Load vendors and stores
+    }, [onLocationSelect]);
 
+    // Load vendors and stores
     const loadVendorsAndStores = async () => {
         try {
             console.log('🔄 Loading vendors and stores...');
@@ -247,8 +250,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             const container = mapRef.current.getContainer();
             container.style.cursor = isAddingMode ? 'crosshair' : '';
         }
-    }, [isAddingMode]);    // Handle vendors - only recreate when vendors data actually changes
+    }, [isAddingMode]);
 
+    // Handle vendors - only recreate when vendors data actually changes
     const vendorsKey = useMemo(() => {
         return vendors.map(v => `${v.id}:${v.name}:${v.latitude}:${v.longitude}`).sort().join('|');
     }, [vendors]);
@@ -413,17 +417,21 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             .map(([id, delivery]) => `${id}:${delivery.currentLatitude}:${delivery.currentLongitude}:${delivery.status}`)
             .sort()
             .join(',');
-    }, [deliveries]);// Handle delivery markers with ULTRA DETAILED LOGGING
+    }, [deliveries]); // Handle delivery markers with ULTRA DETAILED LOGGING
+
     useEffect(() => {
         if (!mapRef.current) {
             console.log('❌ Map not ready, skipping delivery markers update');
             return;
-        } console.log('🚛 === DELIVERY MARKERS UPDATE ===');
+        }
+        console.log('🚛 === DELIVERY MARKERS UPDATE ===');
         const updateTime = new Date().toLocaleTimeString();
         console.log(`🚛 Update time: ${updateTime}`);
         console.log('🚛 Received deliveries:', Object.keys(deliveries));
         console.log('🚛 Current markers:', Object.keys(deliveryMarkersRef.current));
-        console.log('🚛 Map instance:', mapRef.current);        // Process each delivery
+        console.log('🚛 Map instance:', mapRef.current);
+
+        // Process each delivery
         Object.entries(deliveries).forEach(([deliveryId, delivery]) => {
             console.log(`🚛 Processing delivery ${deliveryId}:`, delivery);
 
@@ -436,7 +444,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             if (!delivery.currentLatitude || !delivery.currentLongitude) {
                 console.log(`🚛 ❌ Delivery ${deliveryId} has no coordinates`);
                 return;
-            }// Update or create route for this delivery ONLY ONCE
+            }
+            // Update or create route for this delivery ONLY ONCE
             if (!deliveryRoutesRef.current[deliveryId]) {
                 console.log(`🛣️ Creating route for delivery ${deliveryId} for the first time`);
                 updateDeliveryRoute(deliveryId, delivery);
@@ -445,7 +454,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             }
 
             const existingMarker = deliveryMarkersRef.current[deliveryId];
-            console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS'); if (existingMarker) {
+            console.log(`🚛 Existing marker for ${deliveryId}:`, existingMarker ? 'EXISTS' : 'NOT EXISTS');
+            if (existingMarker) {
                 // Check if truck has arrived at destination
                 if (delivery.vendorLatitude && delivery.vendorLongitude &&
                     delivery.storeLatitude && delivery.storeLongitude) {
@@ -456,15 +466,17 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                     const isAtDestination = latDiff < 0.0005 && lngDiff < 0.0005; // Збільшено поріг
                     const isDelivered = delivery.status === 4 || delivery.status === 'Delivered';
                     const hasArrivalMessage = delivery.lastLocationUpdate &&
-                        String(delivery.lastLocationUpdate).includes('Прибуття'); console.log(`🎯 Delivery ${deliveryId} arrival check:`, {
-                            isAtDestination,
-                            isDelivered,
-                            hasArrivalMessage,
-                            latDiff,
-                            lngDiff,
-                            status: delivery.status,
-                            lastUpdate: String(delivery.lastLocationUpdate)
-                        }); // SIMPLIFIED CONDITION: if truck is at destination - show arrival
+                        String(delivery.lastLocationUpdate).includes('Прибуття');
+
+                    console.log(`🎯 Delivery ${deliveryId} arrival check:`, {
+                        isAtDestination,
+                        isDelivered,
+                        hasArrivalMessage,
+                        latDiff,
+                        lngDiff,
+                        status: delivery.status,
+                        lastUpdate: String(delivery.lastLocationUpdate)
+                    }); // SIMPLIFIED CONDITION: if truck is at destination - show arrival
 
                     if (isAtDestination && !arrivedDeliveriesRef.current.has(deliveryId)) {
                         console.log(`🎯 Delivery ${deliveryId} has arrived at destination!`);
@@ -513,7 +525,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                             onDeliveryArrived(deliveryId);
                         }
 
-                        // Remove truck and route after exactly 5 seconds to give user time to see arrival
+                        // Remove truck and route after exactly 3 seconds to give user time to see arrival
                         setTimeout(() => {
                             console.log(`🗑️ Removing delivery ${deliveryId} after arrival display`);
 
@@ -524,7 +536,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                                 console.log(`🚛 ✅ Removed truck marker for delivery ${deliveryId}`);
                             }
 
-                            // Remove route more forcefully
+                            // Remove ONLY the specific route for this delivery
                             if (deliveryRoutesRef.current[deliveryId]) {
                                 const route = deliveryRoutesRef.current[deliveryId];
                                 if (mapRef.current?.hasLayer(route)) {
@@ -534,25 +546,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                                 delete deliveryRoutesRef.current[deliveryId];
                                 console.log(`🛣️ ✅ Deleted route reference for delivery ${deliveryId}`);
                             }
-
-                            // Force remove ALL polylines that might be related to this delivery
-                            let removedCount = 0;
-                            mapRef.current?.eachLayer((layer) => {
-                                if (layer instanceof L.Polyline) {
-                                    // Remove any polyline that looks like a delivery route
-                                    const options = (layer as any).options;
-                                    if (options.dashArray === '5, 5' || options.dashArray === '10, 10') {
-                                        mapRef.current?.removeLayer(layer);
-                                        removedCount++;
-                                        console.log(`🛣️ ✅ Force removed polyline`);
-                                    }
-                                }
-                            });
-
-                            if (removedCount > 0) {
-                                console.log(`🛣️ ✅ Force removed ${removedCount} additional polylines`);
-                            }
-                        }, 3000); // 5 seconds for backend sync
+                        }, 3000); // 3 seconds for user to see arrival
 
                         return; // Don't continue with normal update
                     }
@@ -635,9 +629,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
                 console.log(`🚛 🗑️ Removing marker for delivery ${deliveryId} (no longer exists)`);
                 const marker = deliveryMarkersRef.current[deliveryId];
-                const route = deliveryRoutesRef.current[deliveryId];
-
-                if (marker) {
+                const route = deliveryRoutesRef.current[deliveryId]; if (marker) {
                     mapRef.current?.removeLayer(marker);
                     delete deliveryMarkersRef.current[deliveryId];
                     console.log(`🚛 ✅ Removed marker for delivery ${deliveryId}`);
@@ -646,7 +638,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 if (route) {
                     mapRef.current?.removeLayer(route);
                     delete deliveryRoutesRef.current[deliveryId];
-                    console.log(`🚛 ✅ Removed route for delivery ${deliveryId}`);
+                    console.log(`🛣️ ✅ Removed route for delivery ${deliveryId}`);
                 }
 
                 // Also remove from arrived deliveries set
