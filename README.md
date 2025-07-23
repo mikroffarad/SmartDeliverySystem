@@ -1,36 +1,50 @@
-# Smart Delivery System - React Migration
+# Smart Delivery System - React + TypeScript
 
-Automated system, which tracks delivery and process them.
+Interactive delivery tracking system with real-time visualization on a world map.
 
-**Project flow:**
-1) Vendor pings our application, that delivery is ready.
-Attaches a list of products, which are ready to go.
-2) Application checks which store more relevant for this cargo.
-3) Application responds with the most quick way to deliver the cargo.
-Attaches a location of desired store.
-4) Vendor bills Application with correspondent sum.
-5) Application proceed the payment.
-6) Vendor attaches DriverId, DeliveryType, Location(departed from), Location(where to), GpsTrackerId
-7) Application, connects to delivery.
-8) Application should track each Delivery and display it on map
+**Project Flow:**
+1. Full-scale world map with initial focus on Ukraine
+2. Users can create two types of markers: **vendors** (suppliers) and **stores**
+3. **Vendor popup functionality:** add/edit/delete products, create delivery requests, delete vendor (if no products/deliveries exist)
+4. **Store popup functionality:** view inventory (products added only via deliveries), delete store (if no products/deliveries exist)
+5. **Delivery process:** select products and quantities → choose store (manual or "Auto-select best store") → payment → automatic driver/GPS assignment
+6. **Auto-select algorithm:** finds best store based on distance (shorter = better) and current inventory (less = better)
+7. Truck icon appears near vendor with route visualization to destination store
+8. Azure Timer Function moves truck along route every second
+9. Upon arrival, popup shows "delivery completed" for few seconds, then truck/route disappear
+10. Products are automatically added to store inventory
+11. **Active Deliveries** section shows current deliveries in progress
+12. **All Deliveries** section shows complete delivery history with GPS tracking details
 
-**Technical stack:**
-- *Azure Functions(ServiceBusTrigger func, TableStorageTrigger func, TimerTrigger func?)
-- TableStorage
-- SQL Server
-- Microservices
-- SignalR?*
+**Technical Stack:**
+- **Frontend:** React + TypeScript + Vite + Leaflet.js + SignalR
+- **Backend:** ASP.NET Core Web API + Entity Framework
+- **Database:** SQL Server (main data) + Azure Table Storage (GPS history)
+- **Azure Functions:** Timer Trigger for truck movement simulation
+- **Real-time:** SignalR Hub
+- **Routing:** OSRM Backend (Docker container)
+- **Testing:** xUnit (unit and integration tests)
 
-**Test Data:**
-The project includes a TestDataController that creates simplified test data:
-- 1 vendor (Київський Продуктовий Центр) located in central Kyiv
-- 5 products from this vendor (bread, milk, apples, eggs, buckwheat)
-- 10 stores in different districts of Kyiv
-- Each store has all products in different quantities (50-200 units)
+**Architecture:**
+```
+Frontend (React) ↔ Web API ↔ SQL Server
+                      ↓
+               Azure Functions (Timer) ↔ Table Storage
+                      ↓
+               SignalR Hub (Real-time updates)
+                      ↓
+               OSRM Backend (Routing)
+```
 
 How to run:
 1. Clone repo
-2. Open with Visual Studio or Visual Studio Code
+2. **Setup OSRM Docker container:**
+   ```bash
+   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/ukraine-latest.osm.pbf
+   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/ukraine-latest.osrm
+   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/ukraine-latest.osrm
+   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/ukraine-latest.osrm
+   ```
 3. **Copy configuration files:**
    ```bash
    cp SmartDeliverySystem/appsettings.template.json SmartDeliverySystem/appsettings.json
@@ -43,16 +57,19 @@ How to run:
    dotnet ef migrations add InitialCreate
    dotnet ef database update
    ```
-6. Run project
+6. **Install frontend dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   ```
+7. **Run all services:**
+   - Backend: `dotnet run` (SmartDeliverySystem)
+   - Azure Functions: `func start` (SmartDeliverySystem.Azure.Functions)
+   - Frontend: `npm run dev` (frontend directory)
 
 ## API Usage Examples
 
-### 1. Seed Test Data
-```bash
-POST /api/testdata/seed
-```
-
-### 2. Request Delivery
+### 1. Request Delivery
 ```json
 POST /api/delivery/request
 {
@@ -70,7 +87,7 @@ POST /api/delivery/request
 }
 ```
 
-### 3. Pay for Delivery
+### 2. Pay for Delivery
 ```json
 POST /api/delivery/{id}/pay
 {
@@ -79,7 +96,7 @@ POST /api/delivery/{id}/pay
 }
 ```
 
-### 4. Assign Driver
+### 3. Assign Driver
 ```json
 POST /api/delivery/{id}/assign-driver
 {
@@ -90,7 +107,7 @@ POST /api/delivery/{id}/assign-driver
 ```
 *Note: Coordinates are automatically taken from the delivery record (vendor → store route)*
 
-### 5. Update GPS Location
+### 4. Update GPS Location
 ```json
 POST /api/delivery/{id}/update-location
 {
@@ -101,12 +118,12 @@ POST /api/delivery/{id}/update-location
 }
 ```
 
-### 6. Get Delivery Tracking
+### 5. Get Delivery Tracking
 ```bash
 GET /api/delivery/{id}/tracking
 ```
 
-### 7. Get All Active Tracking
+### 6. Get All Active Tracking
 ```bash
 GET /api/delivery/tracking/active
 ```
@@ -120,22 +137,38 @@ GET /api/delivery/tracking/active
 5. **Driver** updates location → System tracks in real-time
 6. **System** provides tracking info to all stakeholders
 
-## Next Steps
+## Features Implemented
 
-- [x] **Azure Functions integration** ✅
-- [x] **Service Bus for async processing** ✅
-- [x] **Table Storage for GPS history** ✅
-- [x] **SignalR for real-time updates** ✅
-- [x] Frontend map visualization
+- [x] **Interactive world map** with Leaflet.js and Ukraine focus
+- [x] **Vendor and Store management** with map markers and popups
+- [x] **Product CRUD operations** through vendor popups
+- [x] **Smart store selection algorithm** (distance + inventory optimization)
+- [x] **Payment processing** and automatic driver assignment
+- [x] **Real-time truck tracking** with route visualization
+- [x] **Azure Timer Functions** for truck movement simulation
+- [x] **SignalR** for real-time updates
+- [x] **GPS history** stored in Azure Table Storage
+- [x] **OSRM integration** for route calculation
+- [x] **Active Deliveries** monitoring section
+- [x] **Complete delivery history** with GPS tracking details
+
+## Auto-Select Best Store Algorithm
+The system automatically selects the optimal store based on two criteria:
+1. **Distance** from vendor to store (shorter = better)
+2. **Current inventory** in the store (less = better)
+
+This ensures optimal product distribution and minimizes delivery time.
 
 ## Azure Architecture
 
 ```
-Web API → Service Bus → Azure Functions → SQL Database
+Web API → Azure Functions → SQL Database
                     ↓
                Table Storage (GPS History)
                     ↓
                SignalR Hub (Real-time updates)
+                    ↓
+               OSRM Backend (Routing)
 ```
 
 ## ⚠️ Security Notice
@@ -145,59 +178,48 @@ Web API → Service Bus → Azure Functions → SQL Database
 - Add real config files to `.gitignore`
 - Use Azure Key Vault for production
 
-## Структура проєкту
-Я переписав ваш HTML-файл на React з TypeScript, створивши модульну структуру:
+## Project Structure
 
 ```
-src/
-├── components/           # React компоненти
-│   ├── MapContainer.tsx     # Карта Leaflet
-│   ├── DeliveryInfo.tsx     # Інформація про доставки
-│   ├── ControlButtons.tsx   # Кнопки керування
-│   ├── AddLocationModal.tsx # Модальне вікно додавання локацій
-│   ├── ProductsModal.tsx    # Модальне вікно продуктів
-│   ├── StoreProductsModal.tsx # Модальне вікно інвентаря
-│   ├── DeliveryModal.tsx    # Модальне вікно доставки
-│   ├── PaymentModal.tsx     # Модальне вікно платежів
-│   └── DriverModal.tsx      # Модальне вікно водіїв
-├── services/
-│   └── deliveryApi.ts       # API сервіс для REST запитів
-├── types/
-│   └── delivery.ts          # TypeScript типи
-├── App.tsx                  # Головний компонент
-├── App.css                  # Стилі додатку
-├── main.tsx                 # Точка входу
-└── index.css                # Глобальні стилі
+SmartDeliverySystem/              # Main Web API project
+SmartDeliverySystem.Azure.Functions/  # Azure Functions (Timer triggers)
+SmartDeliverySystem.Tests/        # Unit and Integration tests
+frontend/                         # React + TypeScript frontend
+├── src/
+│   ├── components/              # React components
+│   │   ├── MapContainer.tsx     # Leaflet map component
+│   │   ├── DeliveryInfo.tsx     # Delivery information display
+│   │   ├── ControlButtons.tsx   # Control buttons
+│   │   ├── AddLocationModal.tsx # Location addition modal
+│   │   ├── ProductsModal.tsx    # Product management modal
+│   │   ├── StoreProductsModal.tsx # Store inventory modal
+│   │   ├── DeliveryModal.tsx    # Delivery request modal
+│   │   ├── PaymentModal.tsx     # Payment processing modal
+│   │   └── DriverModal.tsx      # Driver assignment modal
+│   ├── services/
+│   │   └── deliveryApi.ts       # API service for REST requests
+│   ├── types/
+│   │   └── delivery.ts          # TypeScript type definitions
+│   ├── App.tsx                  # Main component
+│   ├── App.css                  # Application styles
+│   ├── main.tsx                 # Entry point
+│   └── index.css                # Global styles
+docker/                          # OSRM backend container setup
 ```
 
-## Встановлення залежностей
-```bash
-npm install
-```
+## Implementation Status
 
-## Запуск проєкту
-```bash
-npm run dev
-```
+The project successfully implements:
+1. ✅ Modular React structure with TypeScript
+2. ✅ API service for REST requests
+3. ✅ Real-time SignalR integration
+4. ✅ Interactive Leaflet map
+5. ✅ Form handling and modal windows
+6. ✅ Comprehensive delivery tracking system
 
-## Що зроблено:
-1. ✅ Створено модульну структуру React
-2. ✅ Виділено типи TypeScript
-3. ✅ Створено API сервіс для REST запитів
-4. ✅ Створено компоненти для всіх функцій
-5. ✅ Налаштовано Vite для швидкої розробки
-6. ✅ Додано стилі CSS
-
-## Що потрібно доробити:
-1. Встановити пакети: `npm install`
-2. Реалізувати JSX для компонентів (зараз це заглушки)
-3. Додати SignalR підключення
-4. Інтегрувати Leaflet карту
-5. Додати обробку форм і модальних вікон
-
-## Переваги нової структури:
-- Модульність і переважання коду
-- Типобезпека TypeScript
-- Швидка розробка з Vite
-- Легка підтримка і розширення
-- Розділення логіки і представлення
+## Benefits of Current Architecture
+- Modular and reusable code structure
+- TypeScript type safety
+- Fast development with Vite
+- Easy maintenance and extension
+- Clear separation of concerns
