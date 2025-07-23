@@ -1,13 +1,28 @@
-# Smart Delivery System - React + TypeScript
+<h2 align="center">
+  <img src="SmartDeliverySystem.Frontend\src\images\favicon.ico" alt="Easy Effects icon" width="150" height="150"/>
+  <br>
+  Smart Delivery System
+</h2>
 
-Interactive delivery tracking system with real-time visualization on a world map.
+<p align="center">
+  <strong>Interactive delivery tracking system with real-time visualization on a world map.</strong>
+</p>
 
 **Project Flow:**
 1. Full-scale world map with initial focus on Ukraine
 2. Users can create two types of markers: **vendors** (suppliers) and **stores**
-3. **Vendor popup functionality:** add/edit/delete products, create delivery requests, delete vendor (if no products/deliveries exist)
-4. **Store popup functionality:** view inventory (products added only via deliveries), delete store (if no products/deliveries exist)
-5. **Delivery process:** select products and quantities → choose store (manual or "Auto-select best store") → payment → automatic driver/GPS assignment
+3. **Vendor popup functionality:**
+    - add/edit/delete products,
+    - create delivery requests,
+    - delete vendor (if no products/deliveries exist).
+4. **Store popup functionality:**
+    - view inventory (products added only via deliveries),
+    - delete store (if no products/deliveries exist).
+5. **Delivery process:**
+    - select products and quantities,
+    - choose store (manual or "Auto-select best store"),
+    - payment,
+    - automatic driver/GPS assignment.
 6. **Auto-select algorithm:** finds best store based on distance (shorter = better) and current inventory (less = better)
 7. Truck icon appears near vendor with route visualization to destination store
 8. Azure Timer Function moves truck along route every second
@@ -23,15 +38,15 @@ Interactive delivery tracking system with real-time visualization on a world map
 - **Azure Functions:** Timer Trigger for truck movement simulation
 - **Real-time:** SignalR Hub
 - **Routing:** OSRM Backend (Docker container)
-- **Testing:** xUnit (unit and integration tests)
+- **Testing:** xUnit, Moq (unit and integration tests)
 
 **Architecture:**
 ```
 Frontend (React) ↔ Web API ↔ SQL Server
                       ↓
-               Azure Functions (Timer) ↔ Table Storage
-                      ↓
                SignalR Hub (Real-time updates)
+                      ↓
+               Azure Functions (Timer) ↔ Table Storage (GPS History)
                       ↓
                OSRM Backend (Routing)
 ```
@@ -114,7 +129,7 @@ POST /api/delivery/{id}/update-location
   "latitude": 50.4501,
   "longitude": 30.5234,
   "speed": 60.5,
-  "notes": "На дорозі до магазину"
+  "notes": "Movement"
 }
 ```
 
@@ -162,27 +177,20 @@ This ensures optimal product distribution and minimizes delivery time.
 ## Azure Architecture
 
 ```
-Web API → Azure Functions → SQL Database
-                    ↓
-               Table Storage (GPS History)
-                    ↓
-               SignalR Hub (Real-time updates)
-                    ↓
-               OSRM Backend (Routing)
+Web API → Azure Functions (Timer) → SQL Database
+              ↓
+         Table Storage (GPS History)
+              ↓
+         SignalR Hub (Real-time updates)
+              ↓
+         OSRM Backend (Routing)
 ```
-
-## ⚠️ Security Notice
-
-**Never commit real Azure connection strings to Git!**
-- Use template files (`*.template.json`)
-- Add real config files to `.gitignore`
-- Use Azure Key Vault for production
 
 ## Project Structure
 
 ```
 SmartDeliverySystem/              # Main Web API project
-SmartDeliverySystem.Azure.Functions/  # Azure Functions (Timer triggers)
+SmartDeliverySystem.Azure.Functions/  # Azure Functions
 SmartDeliverySystem.Tests/        # Unit and Integration tests
 frontend/                         # React + TypeScript frontend
 ├── src/
@@ -204,7 +212,7 @@ frontend/                         # React + TypeScript frontend
 │   ├── App.css                  # Application styles
 │   ├── main.tsx                 # Entry point
 │   └── index.css                # Global styles
-docker/                          # OSRM backend container setup
+SmartDeliverySystem.OSRM/        # OSRM backend container setup
 ```
 
 ## Implementation Status
