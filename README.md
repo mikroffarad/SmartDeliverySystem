@@ -55,10 +55,10 @@ How to run:
 1. Clone repo
 2. **Setup OSRM Docker container:**
    ```bash
-   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/ukraine-latest.osm.pbf
-   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/ukraine-latest.osrm
-   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/ukraine-latest.osrm
-   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/ukraine-latest.osrm
+    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/ukraine-latest.osm.pbf
+    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/ukraine-latest.osrm
+    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/ukraine-latest.osrm
+    docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/ukraine-latest.osrm
    ```
 3. **Copy configuration files:**
    ```bash
