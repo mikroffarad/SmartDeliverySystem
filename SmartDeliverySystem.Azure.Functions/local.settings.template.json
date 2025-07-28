@@ -6,3 +6,14 @@
         "ServiceBusConnection": "Endpoint=sb://your-servicebus.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=your-key"
     }
 }
+
+// How to get "AzureWebJobsStorage"
+// 1. Go to Storage account (smartdeliverystorage)
+// 2. Left-side panel: Security + networking => Access keys
+// 3. From key1 copy Connection string
+
+// How to get "ServiceBusConnection"
+// 1. Go to Service Bus Namespace (smart-delivery-bus)
+// 2. Left-side panel: Settings => Shared access policies
+// 3. Select policy (RootManageSharedAccessKey)
+// 4. Copy Primary connection string
