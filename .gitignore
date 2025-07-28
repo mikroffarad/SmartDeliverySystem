@@ -510,4 +510,5 @@ SmartDeliverySystem/appsettings.json
 SmartDeliverySystem.Azure.Functions/local.settings.json
 
 # OSRM
-SmartDeliverySystem.OSRM/
+SmartDeliverySystem.OSRM/*
+!SmartDeliverySystem.OSRM/.gitkeep
