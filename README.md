@@ -53,34 +53,95 @@ Frontend (React) ↔ Web API ↔ SQL Server
 
 How to run:
 1. Clone repo
-2. **Setup OSRM Docker container:**
+
+2. **Create Azure Resources (portal.azure.com):**
+
+   **2.1. Create Resource Group:**
+   - Search "Resource groups" → Create
+   - Name: `smart-delivery-rg`
+   - Region: `Poland Central`
+   - Click "Review + create" → Create
+
+   **2.2. Create Storage Account:**
+   - Search "Storage accounts" → Create
+   - Resource group: `smart-delivery-rg`
+   - Name: `smartdeliverystorage` (globally unique)
+   - Region: `Poland Central`
+   - Performance: Standard, Redundancy: LRS
+   - Click "Review + create" → Create
+
+   **2.3. Create Service Bus Namespace:**
+   - Search "Service Bus" → Create
+   - Resource group: `smart-delivery-rg`
+   - Name: `smart-delivery-bus`
+   - Region: `Poland Central`
+   - Pricing tier: Basic
+   - Click "Review + create" → Create
+
+   **2.4. Create Function App:**
+   - Search "Function App" → Create
+   - Resource group: `smart-delivery-rg`
+   - Name: `smart-delivery-functions`
+   - Runtime stack: .NET, Version: 8 (LTS), Isolated
+   - Region: `West Europe`
+   - Storage: Use existing `smartdeliverystorage`
+   - Click "Review + create" → Create
+
+   **2.5. Create Service Bus Queues:**
+   - Go to `smart-delivery-bus` → Queues
+   - Create queue: `delivery-requests`
+   - Create queue: `location-updates`
+
+3. **Download OSM data and setup OSRM Docker container:**
    ```bash
-    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/ukraine-latest.osm.pbf
-    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/ukraine-latest.osrm
-    docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/ukraine-latest.osrm
-    docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/ukraine-latest.osrm
+   # Navigate to OSRM directory and download Ukraine OSM data
+   cd SmartDeliverySystem.OSRM
+   wget http://download.geofabrik.de/europe/ukraine-latest.osm.pbf
+
+   # Build OSRM routing engine (4 steps)
+   docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/ukraine-latest.osm.pbf
+   docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-partition /data/ukraine-latest.osrm
+   docker run -t -v "${PWD}:/data" osrm/osrm-backend osrm-customize /data/ukraine-latest.osrm
+
+   # Run OSRM server (keep this running)
+   docker run -t -i -p 5000:5000 -v "${PWD}:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/ukraine-latest.osrm
    ```
-3. **Copy configuration files:**
+
+4. **Copy configuration files:**
    ```bash
+   cd SmartDeliverySystem
    cp SmartDeliverySystem/appsettings.template.json SmartDeliverySystem/appsettings.json
    cp SmartDeliverySystem.Azure.Functions/local.settings.template.json SmartDeliverySystem.Azure.Functions/local.settings.json
    ```
-4. **Edit connection strings** in `appsettings.json` and `local.settings.json` with your actual values
-5. Install Entity Framework tools and create database:
+
+5. **Edit connection strings** in `appsettings.json` and `local.settings.json`:
+   - **ServiceBus**: `smart-delivery-bus` → Shared access policies → RootManageSharedAccessKey → Connection string
+   - **AzureStorage**: `smartdeliverystorage` → Access keys → key1 → Connection string
+   - **DefaultConnection**: Your SQL Server connection string
+
+6. Install Entity Framework tools and create database:
    ```bash
    dotnet tool install --global dotnet-ef
    dotnet ef migrations add InitialCreate
    dotnet ef database update
    ```
-6. **Install frontend dependencies:**
+
+7. **Install frontend dependencies:**
    ```bash
    cd frontend
    npm install
    ```
-7. **Run all services:**
+
+8. **Run all services:**
    - Backend: `dotnet run` (SmartDeliverySystem)
    - Azure Functions: `func start` (SmartDeliverySystem.Azure.Functions)
    - Frontend: `npm run dev` (frontend directory)
+
+9. **Deploy Azure Functions:**
+   ```bash
+   cd SmartDeliverySystem.Azure.Functions
+   func azure functionapp publish smart-delivery-functions
+   ```
 
 ## API Usage Examples
 
@@ -154,37 +215,43 @@ GET /api/delivery/tracking/active
 
 ## Features Implemented
 
-- [x] **Interactive world map** with Leaflet.js and Ukraine focus
-- [x] **Vendor and Store management** with map markers and popups
-- [x] **Product CRUD operations** through vendor popups
-- [x] **Smart store selection algorithm** (distance + inventory optimization)
-- [x] **Payment processing** and automatic driver assignment
-- [x] **Real-time truck tracking** with route visualization
-- [x] **Azure Timer Functions** for truck movement simulation
-- [x] **SignalR** for real-time updates
-- [x] **GPS history** stored in Azure Table Storage
-- [x] **OSRM integration** for route calculation
-- [x] **Active Deliveries** monitoring section
-- [x] **Complete delivery history** with GPS tracking details
-
-## Auto-Select Best Store Algorithm
-The system automatically selects the optimal store based on two criteria:
-1. **Distance** from vendor to store (shorter = better)
-2. **Current inventory** in the store (less = better)
-
-This ensures optimal product distribution and minimizes delivery time.
+- [x] **Core delivery functionality** with vendor-to-store routing ✅
+- [x] **GPS tracking system** with real-time location updates ✅
+- [x] **Azure Functions integration** with ServiceBus and Timer triggers ✅
+- [x] **Service Bus async processing** for delivery and location updates ✅
+- [x] **SignalR real-time tracking** with WebSocket updates ✅
+- [x] **Interactive delivery map** with live GPS visualization ✅
+- [x] **Table Storage** for GPS history and route data ✅
+- [x] **Automatic drone movement** simulation with linear flight paths ✅
 
 ## Azure Architecture
 
 ```
-Web API → Azure Functions (Timer) → SQL Database
-              ↓
-         Table Storage (GPS History)
-              ↓
-         SignalR Hub (Real-time updates)
-              ↓
-         OSRM Backend (Routing)
+Web API → Service Bus → Azure Functions → SQL Database
+                    ↓
+               Table Storage (GPS History)
+                    ↓
+               SignalR Hub (Real-time updates)
+                    ↓
+               Interactive Map (Live tracking)
 ```
+
+## ⚠️ Security Notice
+
+**Never commit real Azure connection strings to Git!**
+- Use template files (`*.template.json`)
+- Add real config files to `.gitignore`
+- Use Azure Key Vault for production
+
+## Azure Resources Overview
+
+Your Azure setup should include these resources:
+- **smart-delivery-rg**: Resource Group (Poland Central)
+- **smartdeliverystorage**: Storage Account (Table Storage + Functions storage)
+- **smart-delivery-bus**: Service Bus Namespace (async messaging)
+- **smart-delivery-functions**: Function App (West Europe, .NET 8 Isolated)
+
+All resources use the same Resource Group for easy management and cost tracking.
 
 ## Project Structure
 
