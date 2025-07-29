@@ -133,8 +133,8 @@ How to run:
    ```
 
 8. **Run all services:**
-   - Backend: `dotnet run` (SmartDeliverySystem)
-   - Azure Functions: `func start` (SmartDeliverySystem.Azure.Functions)
+   - Backend: `dotnet run --launch profile "https"` (SmartDeliverySystem)
+   - Azure Functions: `func start` (SmartDeliverySystem.Azure.Functions, make sure you have [azure-functions-core-tools](https://github.com/Azure/azure-functions-core-tools) installer)
    - Frontend: `npm run dev` (frontend directory)
 
 9. **Deploy Azure Functions:**
